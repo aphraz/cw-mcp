@@ -36,7 +36,6 @@ An MCP (Model Context Protocol) server for seamless integration with the Cloudwa
 - 📦 **Application Deployment**: Deploy new applications and manage existing ones
 - ⚙️ **Configuration Management**: Update server and application settings
 - 🔐 **Security Operations**: Manage SSH keys, SSL certificates, and firewall rules
-- 📈 **Advanced Analytics**: Custom reporting and trend analysis
 
 ## 🏗️ Architecture
 
@@ -79,7 +78,7 @@ cd cloudways-mcp
 pip install -r requirements.txt
 ```
 
-3. **Configure environment** (optional production settings):
+3. **Configure environment**:
 ```bash
 export ENCRYPTION_KEY="your-encryption-key"  # Auto-generated if not set
 export REDIS_URL="redis://localhost:6379/0"   # Default Redis connection
@@ -194,8 +193,6 @@ Claude: Let me check the server details and package information...
 
 ### Application Management
 ```
-You: "I have a WordPress site that's running slowly. Can you help diagnose?"
-Claude: I'll check your application metrics and server resources...
 
 You: "What are the database credentials for my e-commerce app?"
 Claude: I'll retrieve the application credentials securely...
@@ -230,49 +227,12 @@ Claude: Let me show you available server sizes, and regions...
 - **Token Bucket Algorithm**: Smooth traffic distribution
 - **Graceful Degradation**: Clear error messages when limits exceeded
 
-## 🐛 Troubleshooting
-
-### Common Issues
-
-**Connection Refused**
-```bash
-# Check if server is running
-curl http://127.0.0.1:7000/mcp
-
-# Check logs for errors
-python cw-mcp.py
-```
-
-**Authentication Errors**
-```bash
-# Verify credentials
-curl -H "x-cloudways-email: your@email.com" \
-     -H "x-cloudways-api-key: your-key" \
-     http://127.0.0.1:7000/mcp
-```
-
-**Redis Connection Issues**
-```bash
-# Test Redis connection
-redis-cli ping
-
-# Use non-Redis mode (limited features)
-python mcp-no-redis.py
-```
-
 ### Debug Mode
 Enable verbose logging:
 ```bash
 export LOG_LEVEL=DEBUG
 python cw-mcp.py
 ```
-
-### Token Status
-Use the built-in monitoring:
-- `get_token_status` - Check token health
-- `rate_limit_status` - Check API usage
-- `customer_info` - Verify customer setup
-
 
 ## 🆘 Support
 
