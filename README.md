@@ -71,8 +71,8 @@ Add this to your Claude Desktop configuration file:
         "x-cloudways-api-key: ${CLOUDWAYS_API_KEY}"
       ],
       "env": {
-        "CLOUDWAYS_EMAIL": "afrazahmed@digitalocean.com",
-        "CLOUDWAYS_API_KEY": "YJIETo3FlNT2IlMjNiNW4OoDeiZjl6"
+        "CLOUDWAYS_EMAIL": "your primary cloudways email",
+        "CLOUDWAYS_API_KEY": "<cloudways API Key>"
       }
     }
   }
