@@ -61,36 +61,120 @@ An MCP (Model Context Protocol) server for seamless integration with the Cloudwa
 
 ### Prerequisites
 
-- Python 3.8+
-- Redis server (for production features)
-- Cloudways account with API access
+- **Python 3.8+** - For running the MCP server
+- **Node.js 18+ and NPM** - Required for Claude Desktop to connect via `npx mcp-remote`
+- **Redis server** - For production features (token management, rate limiting, customer isolation)
+- **Cloudways account** with API access
+- **Homebrew** (macOS) - For easy installation of dependencies
 
 ### Installation
 
-1. **Clone the repository**:
+#### 1. **Install System Dependencies (macOS)**
+
+**Install Node.js and NPM:**
+```bash
+# Using Homebrew (recommended)
+brew install node
+
+# Verify installation
+node --version  # Should show v18+ 
+npm --version   # Should show npm version
+```
+
+**Install and Setup Redis:**
+```bash
+# Install Redis using Homebrew
+brew install redis
+
+# Start Redis as a background service (auto-restart on boot)
+brew services start redis
+
+# Verify Redis is running
+redis-cli ping  # Should respond with "PONG"
+```
+
+**Alternative Redis Setup:**
+```bash
+# If you prefer to run Redis manually (not as a service)
+/opt/homebrew/opt/redis/bin/redis-server /opt/homebrew/etc/redis.conf
+
+# To stop the Redis service later
+brew services stop redis
+```
+
+#### 2. **Clone and Setup Project**
+
+**Clone the repository**:
 ```bash
 git clone <repository-url>
 cd cloudways-mcp
 ```
 
-2. **Install dependencies**:
+**Create Python virtual environment**:
+```bash
+python3 -m venv venv
+source venv/bin/activate  # On macOS/Linux
+```
+
+**Install Python dependencies**:
 ```bash
 pip install -r requirements.txt
 ```
 
-3. **Configure environment**:
+#### 3. **Configure Environment Variables**
+
+Create a `.env` file in the project root:
 ```bash
-export ENCRYPTION_KEY="your-encryption-key"  # Auto-generated if not set
-export REDIS_URL="redis://localhost:6379/0"   # Default Redis connection
-export RATE_LIMIT_REQUESTS="90"               # Requests per minute per customer
+# Environment Variables for Cloudways MCP Server
+
+# Encryption key (auto-generated if not set)
+ENCRYPTION_KEY=""
+
+# Redis connection URL
+REDIS_URL="redis://localhost:6379/0"
+
+# Rate limiting configuration (requests per minute per customer)
+RATE_LIMIT_REQUESTS="90"
+
+# Optional: Logging level
+LOG_LEVEL="INFO"
 ```
 
-4. **Start the server**:
+#### 4. **Start the MCP Server**
+
 ```bash
+# Make sure you're in the virtual environment
+source venv/bin/activate
+
+# Start the server
 python cw-mcp.py
 ```
 
-The server will start on `http://127.0.0.1:7000/mcp`
+The server will start on `http://127.0.0.1:7000/mcp` and you should see:
+```
+==================================================
+🚀 Cloudways MCP Server
+==================================================
+INFO: Started server process [XXXX]
+INFO: Uvicorn running on http://127.0.0.1:7000 (Press CTRL+C to quit)
+```
+
+#### 5. **Verify Setup**
+
+**Test Redis Connection:**
+```bash
+redis-cli ping  # Should return "PONG"
+```
+
+**Test MCP Server:**
+```bash
+# Check if server is running
+curl -v "http://127.0.0.1:7000/mcp/"
+# Should return a 406 error (expected - means server is working)
+```
+
+**Check Server Logs:**
+The server logs will show successful startup and any connection attempts from Claude Desktop.
 
 ## 🔧 Claude Desktop Integration
 
@@ -232,6 +316,135 @@ Enable verbose logging:
 ```bash
 export LOG_LEVEL=DEBUG
 python cw-mcp.py
+```
+
+## 🔧 Troubleshooting
+
+### Common Issues and Solutions
+
+#### **Node.js/NPM Issues**
+
+**Problem**: `zsh: command not found: node`
+```bash
+# Solution: Install Node.js
+brew install node
+
+# If Homebrew is not installed
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+**Problem**: `npx: command not found`
+```bash
+# NPX comes with npm, reinstall Node.js
+brew uninstall node
+brew install node
+```
+
+#### **Redis Issues**
+
+**Problem**: `Connection refused` when testing Redis
+```bash
+# Check if Redis is running
+brew services list | grep redis
+
+# Start Redis if not running
+brew services start redis
+
+# If Redis was installed via different method
+redis-server /opt/homebrew/etc/redis.conf
+```
+
+**Problem**: Redis connection timeout
+```bash
+# Check Redis status
+redis-cli ping
+
+# If Redis is on different port/host, update .env file
+REDIS_URL="redis://localhost:6380/0"  # Use correct port
+```
+
+#### **MCP Server Issues**
+
+**Problem**: `ModuleNotFoundError` when starting server
+```bash
+# Ensure virtual environment is activated
+source venv/bin/activate
+
+# Reinstall dependencies
+pip install -r requirements.txt
+```
+
+**Problem**: Port 7000 already in use
+```bash
+# Find process using port 7000
+lsof -i :7000
+
+# Kill the process (replace PID with actual process ID)
+kill -9 <PID>
+
+# Or use a different port by modifying cw-mcp.py
+```
+
+**Problem**: Server starts but Claude Desktop can't connect
+```bash
+# Verify server is listening
+curl -v "http://127.0.0.1:7000/mcp/"
+
+# Should return 406 error (this is correct!)
+# Check Claude Desktop config file has correct URL
+```
+
+#### **Claude Desktop Connection Issues**
+
+**Problem**: MCP server not recognized by Claude Desktop
+1. Restart Claude Desktop completely
+2. Check the configuration file location:
+   - macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+3. Verify JSON syntax is valid
+4. Ensure the MCP server is running before starting Claude Desktop
+
+**Problem**: Authentication errors
+1. Verify your Cloudways credentials are correct
+2. Check that your API key has proper permissions
+3. Test credentials manually via Cloudways API
+
+#### **Cloudways API Issues**
+
+**Problem**: `Invalid API key` errors
+```bash
+# Test your credentials directly
+curl -X POST "https://api.cloudways.com/api/v1/oauth/access_token" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "email=your@email.com&api_key=your-api-key"
+```
+
+**Problem**: Rate limiting errors
+- The server implements 90 requests/minute per customer
+- Wait a minute and try again
+- Check server logs for rate limit status
+
+### Getting Help
+
+**Enable Debug Logging:**
+```bash
+# In your .env file
+LOG_LEVEL=DEBUG
+
+# Or export temporarily
+export LOG_LEVEL=DEBUG
+python cw-mcp.py
+```
+
+**Check Server Status:**
+```bash
+# Process check
+ps aux | grep cw-mcp
+
+# Port check  
+lsof -i :7000
+
+# Connection test
+curl -v "http://127.0.0.1:7000/mcp/"
 ```
 
 ## 🆘 Support
