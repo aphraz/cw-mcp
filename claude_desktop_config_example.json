@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "cloudways": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "http://127.0.0.1:7000/mcp",
+        "--header",
+        "x-cloudways-email: ${CLOUDWAYS_EMAIL}",
+        "--header",
+        "x-cloudways-api-key: ${CLOUDWAYS_API_KEY}"
+      ],
+      "env": {
+        "CLOUDWAYS_EMAIL": "<your primary cloudways email>",
+        "CLOUDWAYS_API_KEY": "<cloudways API Key>"
+      }
+    }
+  }
+}
