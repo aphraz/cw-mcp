@@ -1,6 +1,0 @@
-fastmcp
-httpx
-pydantic
-redis
-structlog
-cryptography
