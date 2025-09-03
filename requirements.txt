@@ -1,0 +1,8 @@
+fastmcp
+httpx
+redis
+structlog
+pydantic
+cryptography
+uvicorn
+python-dotenv
