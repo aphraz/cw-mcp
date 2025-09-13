@@ -7,10 +7,10 @@ from typing import Dict, Any
 from fastmcp import Context
 from pydantic import BaseModel
 
-from ..server import mcp
-from ..auth.customer import get_customer_from_headers
-from ..auth.rate_limit import get_rate_limit_status
-from ..utils.api_client import make_api_request
+from server import mcp
+from auth.customer import get_customer_from_headers
+from auth.rate_limit import get_rate_limit_status
+from utils.api_client import make_api_request
 
 # Shared components (will be injected by main.py)
 redis_client = None

@@ -10,7 +10,7 @@ from functools import wraps
 import structlog
 from fastmcp import Context
 
-from ..config import *
+from config import *
 
 logger = structlog.get_logger(__name__)
 
@@ -54,7 +54,7 @@ def log_tool_execution(tool_name: str):
             # Get customer info for context (basic version)
             customer_id = "unknown"
             try:
-                from ..auth.customer import get_customer_from_headers
+                from auth.customer import get_customer_from_headers
                 customer = await get_customer_from_headers(ctx)
                 if customer:
                     customer_id = customer.customer_id

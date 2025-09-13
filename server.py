@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-FastMCP server instance - shared across all modules
+FastMCP server instance
 """
 
 from fastmcp import FastMCP
 
-# Create the FastMCP server instance that can be imported by tool modules
+# Create a single FastMCP instance
+# This is shared across all workers and requests
 mcp = FastMCP("cloudways-mcp")

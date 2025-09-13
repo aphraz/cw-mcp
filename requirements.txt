@@ -4,5 +4,7 @@ redis
 structlog
 pydantic
 cryptography
-uvicorn
+uvicorn[standard]  # Includes uvloop and httptools for better performance
 python-dotenv
+fastapi
+gunicorn  # Production WSGI server

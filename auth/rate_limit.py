@@ -9,7 +9,7 @@ from typing import Optional, Dict, Any
 import redis.asyncio as redis
 import structlog
 
-from ..config import RATE_LIMIT_REQUESTS, RATE_LIMIT_WINDOW
+from config import RATE_LIMIT_REQUESTS, RATE_LIMIT_WINDOW
 
 logger = structlog.get_logger(__name__)
 

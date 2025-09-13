@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "cloudways": {
+      "url": "http://localhost:7000/mcp",
+      "transport": "http"
+    }
+  }
+}

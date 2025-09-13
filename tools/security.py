@@ -7,8 +7,8 @@ from typing import Dict, Any, List
 from fastmcp import Context
 from pydantic import BaseModel
 
-from ..server import mcp
-from ..utils.api_client import make_api_request, make_api_request_post
+from server import mcp
+from utils.api_client import make_api_request, make_api_request_post
 
 # Shared components (will be injected by main.py)
 redis_client = None

@@ -9,10 +9,10 @@ import redis.asyncio as redis
 from fastmcp import Context
 import structlog
 
-from ..config import CLOUDWAYS_API_BASE
-from ..auth.customer import get_customer_from_headers
-from ..auth.tokens import get_cloudways_token
-from ..auth.rate_limit import check_rate_limit
+from config import CLOUDWAYS_API_BASE
+from auth.customer import get_customer_from_headers
+from auth.tokens import get_cloudways_token
+from auth.rate_limit import check_rate_limit
 
 logger = structlog.get_logger(__name__)
 
@@ -62,7 +62,7 @@ async def make_api_request(ctx: Context, endpoint: str, params: Optional[Dict[st
                    response_size=len(str(result)))
         
         # Log to dedicated API logger
-        from .logging import log_api_call
+        from utils.logging import log_api_call
         log_api_call(endpoint, "GET", resp.status_code, 
                     round(request_time * 1000, 2), customer.customer_id)
         

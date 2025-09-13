@@ -1,112 +1,184 @@
 #!/usr/bin/env python3
 """
-Main FastMCP application for Cloudways MCP Server
+Production-grade FastMCP HTTP Server for Cloudways API
 """
 
 import asyncio
 import httpx
 import redis.asyncio as redis
 import structlog
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+import uvicorn
 
 from server import mcp
 from config import REDIS_URL, REDIS_POOL_SIZE, HTTP_POOL_SIZE, configure_logging
 from auth.tokens import TokenManager
 
-# Configure logging from config
+# Configure logging
 configure_logging()
-
 logger = structlog.get_logger(__name__)
 
-# Global components
-redis_client = None
-http_client = None
-token_manager = None
+# Global resource pool - initialized once at startup
+class Resources:
+    """Singleton resource container"""
+    redis_client: redis.Redis = None
+    http_client: httpx.AsyncClient = None
+    token_manager: TokenManager = None
+    initialized: bool = False
 
-async def init_redis():
-    """Initialize Redis connection"""
-    global redis_client
-    try:
-        redis_client = redis.from_url(REDIS_URL, decode_responses=True, max_connections=REDIS_POOL_SIZE)
-        await redis_client.ping()
-        logger.info("Redis connected successfully", url=REDIS_URL)
-    except Exception as e:
-        logger.error("Redis connection failed", error=str(e))
-        redis_client = None
+resources = Resources()
 
-async def init_http_client():
-    """Initialize HTTP client"""
-    global http_client
+async def init_resources():
+    """Initialize all resources once at startup"""
+    if resources.initialized:
+        return
+
+    logger.info("Initializing server resources")
+
+    # Initialize Redis connection pool
     try:
-        http_client = httpx.AsyncClient(
-            limits=httpx.Limits(max_connections=HTTP_POOL_SIZE, max_keepalive_connections=100),
-            timeout=httpx.Timeout(connect=10.0, read=30.0, write=10.0, pool=5.0)
+        resources.redis_client = redis.from_url(
+            REDIS_URL,
+            decode_responses=True,
+            max_connections=REDIS_POOL_SIZE
         )
-        logger.info("HTTP client initialized")
+        await resources.redis_client.ping()
+        logger.info("Redis connected", pool_size=REDIS_POOL_SIZE)
     except Exception as e:
-        logger.error("HTTP client initialization failed", error=str(e))
-        http_client = None
+        logger.warning("Redis unavailable, running without cache", error=str(e))
 
-def inject_dependencies():
-    """Inject shared components into tool modules"""
-    global redis_client, http_client, token_manager
-    
-    # Import all tool modules to trigger @mcp.tool decorator registration
+    # Initialize HTTP client pool
+    resources.http_client = httpx.AsyncClient(
+        limits=httpx.Limits(
+            max_connections=HTTP_POOL_SIZE,
+            max_keepalive_connections=100
+        ),
+        timeout=httpx.Timeout(30.0, connect=10.0)
+    )
+    logger.info("HTTP client initialized", pool_size=HTTP_POOL_SIZE)
+
+    # Initialize token manager if Redis is available
+    if resources.redis_client:
+        resources.token_manager = TokenManager(
+            resources.redis_client,
+            resources.http_client
+        )
+        logger.info("Token manager initialized")
+
+    # Import and inject dependencies into tool modules
+    # This happens ONCE at startup, not per request
     from tools import basic, servers, apps, security
-    
-    # Inject dependencies into all tool modules
-    basic.redis_client = redis_client
-    basic.http_client = http_client
-    basic.token_manager = token_manager
-    
-    servers.redis_client = redis_client
-    servers.http_client = http_client
-    servers.token_manager = token_manager
-    
-    apps.redis_client = redis_client
-    apps.http_client = http_client
-    apps.token_manager = token_manager
-    
-    security.redis_client = redis_client
-    security.http_client = http_client
-    security.token_manager = token_manager
-    
-    logger.info("Dependencies injected into tool modules")
 
-async def startup():
-    """Initialize all components"""
-    global token_manager
-    
-    logger.info("Starting Cloudways MCP Server (Modular)")
-    await init_redis()
-    await init_http_client()
-    
-    if redis_client and http_client:
-        token_manager = TokenManager(redis_client, http_client)
-        logger.info("Token manager initialized with proactive renewal")
-    else:
-        logger.warning("Token manager not initialized - Redis or HTTP client unavailable")
-    
-    inject_dependencies()
-    logger.info("FastMCP server initialized with all tools registered")
+    for module in [basic, servers, apps, security]:
+        module.redis_client = resources.redis_client
+        module.http_client = resources.http_client
+        module.token_manager = resources.token_manager
 
-async def main():
-    """Main entry point"""
-    await startup()
-    try:
-        await mcp.run_async(
-            transport="streamable-http",
-            host="0.0.0.0",
-            port=7000,
-            path="/mcp",
-        )
-    except KeyboardInterrupt:
-        logger.info("Server shutting down gracefully")
-    except Exception as e:
-        logger.error("Server crashed", error=str(e))
-        raise
+    resources.initialized = True
+    logger.info("Server initialization complete")
+
+async def cleanup_resources():
+    """Cleanup resources on shutdown"""
+    if resources.http_client:
+        await resources.http_client.aclose()
+    if resources.redis_client:
+        await resources.redis_client.close()
+    logger.info("Resources cleaned up")
+
+@asynccontextmanager
+async def app_lifespan(app: FastAPI):
+    await init_resources()
+    print("Starting up the app...")
+    # Initialize database, cache, etc.
+    yield
+    await cleanup_resources()
+    print("Shutting down the app...")
+
+# Create the MCP HTTP app FIRST
+mcp_app = mcp.http_app()
+
+@asynccontextmanager
+async def combined_lifespan(app: FastAPI):
+    """Combined lifespan for both FastAPI and FastMCP"""
+    # Initialize our resources
+    #await init_resources()
+
+    # Run the MCP app's lifespan
+    async with app_lifespan(app):
+        async with mcp_app.lifespan(app):
+            yield
+
+    # Cleanup our resources
+    #await cleanup_resources()
+
+# Create FastAPI app with the COMBINED lifespan
+app = FastAPI(
+    title="Cloudways MCP Server",
+    version="1.0.0",
+    lifespan=combined_lifespan  # Use combined lifespan
+)
+
+# Mount the MCP app
+app.mount("/mcp", mcp_app)
+
+@app.get("/health")
+async def health():
+    """Health check endpoint for load balancers"""
+    return {
+        "status": "healthy",
+        "redis": resources.redis_client is not None,
+        "initialized": resources.initialized
+    }
+
+@app.get("/")
+async def root():
+    """Root endpoint"""
+    return {
+        "service": "Cloudways MCP Server",
+        "version": "1.0.0",
+        "endpoints": {
+            "mcp": "/mcp",
+            "health": "/health"
+        }
+    }
+
+def main():
+    """Production server entry point"""
+    import os
+
+    # Production configuration
+    workers = int(os.getenv("WORKERS", "1"))  # Single worker for MCP compatibility
+
+    print("=" * 50)
+    print("🚀 Cloudways MCP Server (Production)")
+    print(f"Workers: {workers}")
+    print(f"Port: 7000")
+    print("=" * 50)
+
+    # For MCP: use single worker to maintain session state
+    # Scale horizontally with multiple instances behind a load balancer instead
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=7000,
+        workers=workers,
+        loop="uvloop" if workers == 1 else "asyncio",  # uvloop for single worker
+        log_level="info",
+        access_log=False,  # Disable in production for performance
+        reload=False
+    )
 
 if __name__ == "__main__":
-    print("=" * 50)
-    print("🚀 Cloudways MCP Server (Modular)")
-    print("=" * 50)
-    asyncio.run(main())
+    # For development: single worker with reload
+    import sys
+    if "--dev" in sys.argv:
+        uvicorn.run(
+            "main:app",
+            host="0.0.0.0",
+            port=7000,
+            reload=True,
+            log_level="debug"
+        )
+    else:
+        main()

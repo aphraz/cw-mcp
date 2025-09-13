@@ -12,7 +12,7 @@ from fastmcp import Context
 from fastmcp.server.dependencies import get_http_request
 import structlog
 
-from ..config import fernet
+from config import fernet
 
 logger = structlog.get_logger(__name__)
 
