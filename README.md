@@ -47,7 +47,7 @@ A comprehensive Model Context Protocol (MCP) server for managing Cloudways infra
 ```
 cw-mcp/
 ├── main.py                 # Application entry point
-├── server.py              # FastMCP server instance  
+├── server.py              # FastMCP server instance
 ├── config.py              # Configuration management
 ├── requirements.txt       # Dependencies
 │
@@ -58,7 +58,7 @@ cw-mcp/
 │
 ├── tools/                 # MCP Tools (43+ tools total)
 │   ├── basic.py          # Core operations (18 tools)
-│   ├── servers.py        # Server management (12 tools) 
+│   ├── servers.py        # Server management (12 tools)
 │   ├── apps.py           # Application management (8 tools)
 │   └── security.py       # Security & access control (5 tools)
 │
@@ -74,24 +74,15 @@ cw-mcp/
 - Redis server (for caching and session management)
 - Cloudways API credentials
 
-### Installation Steps
 
-1. **Clone and setup environment**:
-   ```bash
-   cd ~/projects/google-adk/mcp-servers/cw-mcp
-   python3 -m venv .venv
-   source .venv/bin/activate
-   pip install -r requirements.txt
-   ```
-
-2. **Configure environment variables**:
+1. **Configure environment variables**:
    ```bash
    # Generate encryption key for secure credential storage
    export ENCRYPTION_KEY=$(python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')
-   
+
    # Redis configuration
    export REDIS_URL="redis://localhost:6379/0"
-   
+
    # Optional performance tuning
    export REDIS_POOL_SIZE="500"
    export HTTP_POOL_SIZE="500"
@@ -140,7 +131,7 @@ try:
     test_data = b"test"
     encrypted = fernet.encrypt(test_data)
     decrypted = fernet.decrypt(encrypted)
-    
+
     if decrypted == test_data:
         print("Encryption key is valid")
     else:
@@ -177,52 +168,6 @@ x-cloudways-api-key: your-cloudways-api-key
 - **Token Auto-Renewal**: Proactive OAuth token refresh before expiration
 - **Rate Limiting**: Token bucket algorithm (90 requests/60 seconds by default)
 - **Audit Logging**: Comprehensive request/response logging with structured data
-
-## 📝 Usage Examples
-
-### Basic Server Management
-```python
-# List all servers
-servers = await list_servers()
-
-# Get server details with monitoring data
-details = await get_server_details({"server_id": 378350})
-
-# Start/stop server operations
-await start_server({"server_id": 378350})
-await stop_server({"server_id": 378350})
-```
-
-### Application Operations
-```python
-# Deploy application via Git
-await git_clone({
-    "server_id": 378350,
-    "app_id": 1185437,
-    "repo_url": "git@github.com:user/repo.git",
-    "branch": "main"
-})
-
-# Backup and restore operations
-await backup_app({"server_id": 378350, "app_id": 1185437})
-await restore_app({
-    "server_id": 378350,
-    "app_id": 1185437, 
-    "backup_id": "backup_123"
-})
-```
-
-### Security Management
-```python
-# Whitelist IPs for database access
-await update_whitelisted_ips({
-    "server_id": 378350,
-    "ips": ["192.168.1.100", "10.0.0.5"]
-})
-
-# SSL certificate management
-await install_letsencrypt({"server_id": 378350, "app_id": 1185437})
-```
 
 ## ⚙️ Configuration Options
 
@@ -265,52 +210,16 @@ await install_letsencrypt({"server_id": 378350, "app_id": 1185437})
 async def your_new_tool(ctx: Context, params: YourParamModel) -> Dict[str, Any]:
     """
     Tool description for MCP client
-    
+
     Args:
         params: Parameter model with validation
-    
+
     Returns:
         Standardized response dictionary
     """
     return await make_api_request(
-        ctx, "/your/endpoint", 
-        params.dict(), 
+        ctx, "/your/endpoint",
+        params.dict(),
         redis_client, http_client, token_manager
     )
 ```
-
-## 🚀 Production Deployment
-
-### Docker Deployment
-```dockerfile
-FROM python:3.11-slim
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-COPY . .
-EXPOSE 7000
-CMD ["python", "main.py"]
-```
-
-### Environment Considerations
-- **Redis**: Use Redis Cluster for high availability
-- **Load Balancing**: Multiple server instances behind load balancer
-- **SSL/TLS**: Terminate SSL at load balancer or reverse proxy
-- **Monitoring**: Integrate with Prometheus/Grafana for metrics
-
-## 📄 License
-
-This project is part of the internal tooling ecosystem and follows company licensing guidelines.
-
-## 🤝 Contributing
-
-1. Follow existing code patterns and documentation standards
-2. Ensure comprehensive error handling and logging
-3. Add tests for new functionality
-4. Update documentation for any new tools or features
-
----
-
-**Server Status**: Production Ready ✅  
-**API Coverage**: 43+ Tools Across All Cloudways Functions  
-**Last Updated**: September 2025

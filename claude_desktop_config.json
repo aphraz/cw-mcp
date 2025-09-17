@@ -1,8 +1,20 @@
 {
   "mcpServers": {
     "cloudways": {
-      "url": "http://localhost:7000/mcp",
-      "transport": "http"
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://mcp.afraz.dev/mcp/mcp",
+        "--header",
+        "x-cloudways-email: ${CLOUDWAYS_EMAIL}",
+        "--header",
+        "x-cloudways-api-key: ${CLOUDWAYS_API_KEY}"
+      ],
+      "env": {
+        "CLOUDWAYS_EMAIL": "YOUR EMAIL",
+        "CLOUDWAYS_API_KEY": "API KEY"
+      }
     }
   }
 }
