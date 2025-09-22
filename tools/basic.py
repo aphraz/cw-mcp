@@ -91,34 +91,6 @@ async def get_server_details(ctx: Context, server: ServerIdParam) -> Dict[str, A
                                redis_client, http_client, token_manager)
     return {"status": "success", "bandwidth": bw, "disk": db}
 
-@mcp.tool
-async def get_app_details(ctx: Context, app: AppParams) -> Dict[str, Any]:
-    """
-    Get details of a specific application.
-    
-    Args:
-        app: AppParams object containing:
-            - server_id: Numeric ID of the server
-            - app_id: Numeric ID of the application
-    
-    Returns:
-        Dictionary containing:
-            - status: Success/error status
-            - app: Application object with details like id, label, application type, etc.
-            - Or error message if application not found or operation fails
-    """
-    server_result = await make_api_request(ctx, "/server", None, redis_client, http_client, token_manager)
-    try:
-        if "servers" in server_result:
-            for srv in server_result["servers"]:
-                if srv["id"] == str(app.server_id):
-                    if "apps" in srv:
-                        for application in srv["apps"]:
-                            if application["id"] == str(app.app_id):
-                                return {"status": "success", "app": application}
-        return {"status": "error", "message": "Application not found"}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
 
 @mcp.tool
 async def get_app_credentials(ctx: Context, app: AppParams) -> Dict[str, Any]:
@@ -134,19 +106,6 @@ async def get_app_credentials(ctx: Context, app: AppParams) -> Dict[str, Any]:
     return await make_api_request(ctx, "/app/creds", {"server_id": app.server_id, "app_id": app.app_id}, 
                                  redis_client, http_client, token_manager)
 
-@mcp.tool
-async def get_app_settings(ctx: Context, app: AppParams) -> Dict[str, Any]:
-    """
-    Get application settings.
-    
-    Args:
-        app: AppParams object containing server_id and app_id
-    
-    Returns:
-        Dictionary containing various application settings
-    """
-    return await make_api_request(ctx, "/app/get_settings_value", {"server_id": app.server_id, "app_id": app.app_id}, 
-                                 redis_client, http_client, token_manager)
 
 @mcp.tool
 async def get_app_monitoring_summary(ctx: Context, app: AppParams) -> Dict[str, Any]:
