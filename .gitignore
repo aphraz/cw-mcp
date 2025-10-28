@@ -142,6 +142,7 @@ server.log
 # Configuration files with sensitive data
 *.env
 .env.*
+!.env.example
 config.local.py
 secrets.yaml
 secrets.json
