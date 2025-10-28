@@ -5,7 +5,7 @@ Customer management for Cloudways MCP Server
 
 import json
 import hashlib
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 import redis.asyncio as redis
 from fastmcp import Context
@@ -23,8 +23,8 @@ class Customer:
         self.email = email
         self.cloudways_email = cloudways_email
         self.cloudways_api_key = cloudways_api_key
-        self.created_at = created_at
-        self.last_seen = datetime.utcnow()
+        self.created_at = datetime.now(timezone.utc)
+        self.last_seen = datetime.now(timezone.utc)
 
 async def get_customer_from_headers(ctx: Context, redis_client: Optional[redis.Redis] = None) -> Optional[Customer]:
     """Extract customer information from request headers"""
@@ -34,9 +34,28 @@ async def get_customer_from_headers(ctx: Context, redis_client: Optional[redis.R
         api_key = http_request.headers.get("x-cloudways-api-key")
 
         if not email or not api_key:
+            # Log authentication failure
+            try:
+                from ..utils.logging import log_authentication_event
+                log_authentication_event("auth_failed", "unknown", False, {
+                    "reason": "missing_credentials",
+                    "email_provided": bool(email),
+                    "api_key_provided": bool(api_key)
+                })
+            except:
+                pass
             raise ValueError("Missing authentication headers")
         
-        customer_hash = hashlib.sha256(f"{email}:{api_key}".encode()).hexdigest()
+        # Get session identifier from MCP context or headers
+        session_id = getattr(ctx, 'session_id', None) or http_request.headers.get('x-mcp-session-id')
+        
+        if not session_id:
+            # Generate unique session ID for this connection
+            import secrets
+            session_id = secrets.token_urlsafe(32)
+        
+        # Include session in customer ID to ensure session isolation
+        customer_hash = hashlib.sha256(f"{email}:{api_key}:{session_id}".encode()).hexdigest()
         customer_id = f"customer_{customer_hash[:16]}"
         
         # Check cache
@@ -54,20 +73,23 @@ async def get_customer_from_headers(ctx: Context, redis_client: Optional[redis.R
                         cloudways_api_key=decrypted_key,
                         created_at=datetime.fromisoformat(data["created_at"])
                     )
-                    logger.debug("Customer loaded from cache", customer_id=customer_id)
+                    logger.debug("Customer loaded from cache", customer_id=customer_id, customer_email=customer.email)
                     return customer
             except Exception as e:
                 logger.warning("Failed to load customer from cache", error=str(e))
         
         # Create new customer
-        customer = Customer(customer_id, email, email, api_key, datetime.utcnow())
+        customer = Customer(customer_id, email, email, api_key, datetime.now(timezone.utc))
         await _cache_customer(customer, redis_client)
-        logger.info("New customer created", customer_id=customer_id)
+        logger.info("New customer created", customer_id=customer_id, customer_email=customer.email)
         
         # Log security event
         try:
             from ..utils.logging import log_authentication_event
-            log_authentication_event("new_customer", customer_id, True, {"email": email})
+            log_authentication_event("new_customer", customer_id, True, {
+                "email": email,
+                "ip_address": getattr(http_request.client, 'host', 'unknown') if http_request.client else 'unknown'
+            })
         except:
             pass  # Don't fail customer creation if logging fails
         

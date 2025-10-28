@@ -5,7 +5,7 @@ Server management tools for Cloudways MCP Server
 
 from typing import Dict, Any
 from fastmcp import Context
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 
 from server import mcp
 from utils.api_client import make_api_request, make_api_request_post
@@ -15,10 +15,10 @@ http_client = None
 token_manager = None
 
 class ServerIdParam(BaseModel):
-    server_id: int
+    server_id: int = Field(gt=0, le=999999999, description="Valid server ID")
 
 class ServerOperationParam(BaseModel):
-    server_id: int
+    server_id: int = Field(gt=0, le=999999999, description="Valid server ID")
 
 @mcp.tool
 async def start_server(ctx: Context, server: ServerIdParam) -> Dict[str, Any]:
@@ -133,7 +133,7 @@ async def get_server_services_status(ctx: Context, server: ServerIdParam) -> Dic
                                 redis_client, http_client, token_manager)
 
 class ServiceStateParam(BaseModel):
-    server_id: int
+    server_id: int = Field(gt=0, le=999999999, description="Valid server ID")
     service: str
     state: str  # start, stop, restart
 
@@ -158,7 +158,7 @@ async def change_service_state(ctx: Context, params: ServiceStateParam) -> Dict[
     }, redis_client, http_client, token_manager)
 
 class VarnishStateParam(BaseModel):
-    server_id: int
+    server_id: int = Field(gt=0, le=999999999, description="Valid server ID")
     state: str  # enable, disable, purge
 
 @mcp.tool

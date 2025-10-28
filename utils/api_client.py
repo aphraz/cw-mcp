@@ -34,7 +34,9 @@ async def make_api_request(ctx: Context, endpoint: str, params: Optional[Dict[st
         rate_limit_ok = await check_rate_limit(customer.customer_id, endpoint, redis_client)
         if not rate_limit_ok:
             logger.warning("API request blocked by rate limit", 
-                         customer_id=customer.customer_id, endpoint=endpoint)
+                         customer_id=customer.customer_id,
+                         customer_email=customer.email,
+                         endpoint=endpoint)
             return {"status": "error", "message": "Rate limit exceeded", "retry_after": 60}
         
         token = await get_cloudways_token(customer, token_manager, redis_client, http_client)
@@ -54,7 +56,8 @@ async def make_api_request(ctx: Context, endpoint: str, params: Optional[Dict[st
         # Log successful request with metrics
         total_time = time.time() - start_time
         logger.info("API request successful", 
-                   customer_id=customer.customer_id, 
+                   customer_id=customer.customer_id,
+                   customer_email=customer.email,
                    endpoint=endpoint,
                    status_code=resp.status_code,
                    request_time_ms=round(request_time * 1000, 2),
@@ -108,7 +111,7 @@ async def make_api_request_post(ctx: Context, endpoint: str, data: Optional[Dict
         resp.raise_for_status()
         result = resp.json()
         
-        logger.info("API POST request successful", customer_id=customer.customer_id, endpoint=endpoint)
+        logger.info("API POST request successful", customer_id=customer.customer_id, customer_email=customer.email, endpoint=endpoint)
         return result
         
     except httpx.HTTPStatusError as e:
