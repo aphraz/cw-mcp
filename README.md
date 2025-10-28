@@ -1,17 +1,17 @@
 # Cloudways MCP Server
 
-A comprehensive Model Context Protocol (MCP) server for managing Cloudways infrastructure. This server provides a secure, modular, and scalable interface to the Cloudways API with **43+ tools** covering all aspects of server and application management.
+A Model Context Protocol (MCP) server for managing Cloudways infrastructure. Provides a secure, modular interface to the Cloudways API with **43+ tools** covering server and application management.
 
-## 🚀 Features
+## Features
 
-- **Complete Cloudways API Coverage**: 43+ tools organized into logical categories
-- **Modular Architecture**: Clean separation of concerns with dedicated modules for different functionalities
-- **Enterprise Security**: Multi-layered authentication, rate limiting, and audit logging
-- **High Performance**: Asynchronous design with Redis caching and HTTP connection pooling
-- **Production Ready**: Structured logging, error handling, and monitoring capabilities
+- **Cloudways API Coverage**: 43+ tools organized into logical categories
+- **Modular Architecture**: Separation of concerns with dedicated modules for different functionalities
+- **Security**: Multi-layered authentication with credential encryption, session isolation, rate limiting, and audit logging
+- **Performance**: Asynchronous design with Redis caching and HTTP connection pooling
+- **Production Ready**: Structured logging, error handling, and monitoring
 - **MCP Compatible**: Full Model Context Protocol support for AI assistant integration
 
-## 📊 Tools Overview
+## Tools Overview
 
 ### Basic Operations (18 tools)
 - **Authentication & Info**: `ping`, `customer_info`, `rate_limit_status`
@@ -42,7 +42,7 @@ A comprehensive Model Context Protocol (MCP) server for managing Cloudways infra
 - **SSL Management**: `install_ssl_certificate`, `remove_ssl_certificate`, `install_letsencrypt`, `renew_letsencrypt`, `set_letsencrypt_auto_renewal`, `revoke_letsencrypt`
 - **Git Deployment**: `generate_git_ssh_key`, `get_git_ssh_key`, `git_clone`, `git_pull`, `get_git_deployment_history`, `get_git_branch_names`
 
-## 🏗 Architecture
+## Architecture
 
 ```
 cw-mcp/
@@ -67,7 +67,7 @@ cw-mcp/
     └── logging.py        # Structured logging setup
 ```
 
-## 🔧 Installation & Setup
+## Installation & Setup
 
 ### Prerequisites
 - Python 3.11+
@@ -154,22 +154,24 @@ except Exception as e:
 
    Server will be available at: `http://localhost:7000/mcp`
 
-## 🔐 Authentication
+## Authentication
 
 The server uses header-based authentication with encrypted credential storage:
 
 ```http
-x-cloudways-email: your-email@domain.com
-x-cloudways-api-key: your-cloudways-api-key
+x-cloudways-email: <your-cloudways-email>
+x-cloudways-api-key: <your-cloudways-api-key>
 ```
 
 ### Security Features
 - **Credential Encryption**: API keys encrypted with Fernet before Redis storage
-- **Token Auto-Renewal**: Proactive OAuth token refresh before expiration
+- **Session Isolation**: Unique customer ID generation prevents session cross-contamination
+- **Token Auto-Renewal**: OAuth token refresh before expiration
 - **Rate Limiting**: Token bucket algorithm (90 requests/60 seconds by default)
-- **Audit Logging**: Comprehensive request/response logging with structured data
+- **Input Validation**: Parameter validation with range checks
+- **Audit Logging**: Request/response logging with structured data
 
-## ⚙️ Configuration Options
+## Configuration Options
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -182,26 +184,26 @@ x-cloudways-api-key: your-cloudways-api-key
 | `LOG_LEVEL` | `INFO` | Logging verbosity |
 | `LOG_FORMAT` | `console` | Log format (console/json) |
 
-## 📊 Monitoring & Observability
+## Monitoring & Observability
 
 ### Structured Logging
 - **Performance Metrics**: Request timing and resource usage
 - **Security Events**: Authentication failures, rate limiting
-- **API Interactions**: Full request/response logging with sanitized credentials
-- **Error Tracking**: Comprehensive error context and stack traces
+- **API Interactions**: Request/response logging with sanitized credentials
+- **Error Tracking**: Error context and stack traces
 
 ### Health Checks
 - `ping` - Basic connectivity and authentication test
 - `rate_limit_status` - Current rate limit status
 - `customer_info` - Session and authentication status
 
-## 🔄 Development & Extension
+## Development & Extension
 
 ### Adding New Tools
 1. Choose appropriate module in `tools/` directory
 2. Follow existing patterns for error handling and authentication
 3. Use type hints with Pydantic models for parameters
-4. Include comprehensive docstrings
+4. Include docstrings
 5. Test with various authentication scenarios
 
 ### Tool Development Template
