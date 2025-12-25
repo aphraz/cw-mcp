@@ -13,7 +13,8 @@ from utils.api_client import make_api_request, make_api_request_post
 redis_client = None
 http_client = None  
 token_manager = None
-
+session_manager = None
+browser_authenticator = None
 class ServerIdParam(BaseModel):
     server_id: int = Field(gt=0, le=999999999, description="Valid server ID")
 
@@ -32,7 +33,7 @@ async def start_server(ctx: Context, server: ServerIdParam) -> Dict[str, Any]:
         Dictionary containing operation status and details
     """
     return await make_api_request_post(ctx, "/server/start", {"server_id": server.server_id}, 
-                                     redis_client, http_client, token_manager)
+                                     redis_client, http_client, token_manager, session_manager, browser_authenticator)
 
 @mcp.tool
 async def stop_server(ctx: Context, server: ServerIdParam) -> Dict[str, Any]:
@@ -46,7 +47,7 @@ async def stop_server(ctx: Context, server: ServerIdParam) -> Dict[str, Any]:
         Dictionary containing operation status and details
     """
     return await make_api_request_post(ctx, "/server/stop", {"server_id": server.server_id}, 
-                                     redis_client, http_client, token_manager)
+                                     redis_client, http_client, token_manager, session_manager, browser_authenticator)
 
 @mcp.tool
 async def restart_server(ctx: Context, server: ServerIdParam) -> Dict[str, Any]:
@@ -60,7 +61,7 @@ async def restart_server(ctx: Context, server: ServerIdParam) -> Dict[str, Any]:
         Dictionary containing operation status and details
     """
     return await make_api_request_post(ctx, "/server/restart", {"server_id": server.server_id}, 
-                                     redis_client, http_client, token_manager)
+                                     redis_client, http_client, token_manager, session_manager, browser_authenticator)
 
 @mcp.tool
 async def backup_server(ctx: Context, server: ServerIdParam) -> Dict[str, Any]:
@@ -74,7 +75,7 @@ async def backup_server(ctx: Context, server: ServerIdParam) -> Dict[str, Any]:
         Dictionary containing backup operation status
     """
     return await make_api_request_post(ctx, "/server/manage/backup", {"server_id": server.server_id}, 
-                                     redis_client, http_client, token_manager)
+                                     redis_client, http_client, token_manager, session_manager, browser_authenticator)
 
 @mcp.tool
 async def get_server_settings(ctx: Context, server: ServerIdParam) -> Dict[str, Any]:
@@ -88,7 +89,7 @@ async def get_server_settings(ctx: Context, server: ServerIdParam) -> Dict[str, 
         Dictionary containing server settings and package information
     """
     return await make_api_request(ctx, "/server/manage/settings", {"server_id": server.server_id}, 
-                                redis_client, http_client, token_manager)
+                                redis_client, http_client, token_manager, session_manager, browser_authenticator)
 
 @mcp.tool
 async def get_server_disk_usage(ctx: Context, server: ServerIdParam) -> Dict[str, Any]:
@@ -102,7 +103,7 @@ async def get_server_disk_usage(ctx: Context, server: ServerIdParam) -> Dict[str
         Dictionary containing disk usage details
     """
     return await make_api_request(ctx, f"/server/{server.server_id}/diskUsage", None, 
-                                redis_client, http_client, token_manager)
+                                redis_client, http_client, token_manager, session_manager, browser_authenticator)
 
 @mcp.tool
 async def optimize_server_disk(ctx: Context, server: ServerIdParam) -> Dict[str, Any]:
@@ -116,7 +117,7 @@ async def optimize_server_disk(ctx: Context, server: ServerIdParam) -> Dict[str,
         Dictionary containing optimization operation status
     """
     return await make_api_request_post(ctx, "/server/disk/cleanup", {"server_id": server.server_id}, 
-                                     redis_client, http_client, token_manager)
+                                     redis_client, http_client, token_manager, session_manager, browser_authenticator)
 
 @mcp.tool
 async def get_server_services_status(ctx: Context, server: ServerIdParam) -> Dict[str, Any]:
@@ -130,7 +131,7 @@ async def get_server_services_status(ctx: Context, server: ServerIdParam) -> Dic
         Dictionary containing service status information
     """
     return await make_api_request(ctx, "/service", {"server_id": server.server_id}, 
-                                redis_client, http_client, token_manager)
+                                redis_client, http_client, token_manager, session_manager, browser_authenticator)
 
 class ServiceStateParam(BaseModel):
     server_id: int = Field(gt=0, le=999999999, description="Valid server ID")
@@ -155,7 +156,7 @@ async def change_service_state(ctx: Context, params: ServiceStateParam) -> Dict[
         "server_id": params.server_id,
         "service": params.service,
         "state": params.state
-    }, redis_client, http_client, token_manager)
+    }, redis_client, http_client, token_manager, session_manager, browser_authenticator)
 
 class VarnishStateParam(BaseModel):
     server_id: int = Field(gt=0, le=999999999, description="Valid server ID")
@@ -177,7 +178,7 @@ async def manage_server_varnish(ctx: Context, params: VarnishStateParam) -> Dict
     return await make_api_request_post(ctx, "/service/varnish", {
         "server_id": params.server_id,
         "state": params.state
-    }, redis_client, http_client, token_manager)
+    }, redis_client, http_client, token_manager, session_manager, browser_authenticator)
 
 @mcp.tool
 async def get_server_monitoring_detail(ctx: Context, server: ServerIdParam) -> Dict[str, Any]:
@@ -191,7 +192,7 @@ async def get_server_monitoring_detail(ctx: Context, server: ServerIdParam) -> D
         Dictionary containing detailed monitoring data
     """
     return await make_api_request(ctx, "/server/monitor/detail", {"server_id": server.server_id}, 
-                                redis_client, http_client, token_manager)
+                                redis_client, http_client, token_manager, session_manager, browser_authenticator)
 
 @mcp.tool
 async def get_server_analytics(ctx: Context, server: ServerIdParam) -> Dict[str, Any]:
@@ -205,4 +206,4 @@ async def get_server_analytics(ctx: Context, server: ServerIdParam) -> Dict[str,
         Dictionary containing server usage analytics
     """
     return await make_api_request(ctx, "/server/analytics/serverUsage", {"server_id": server.server_id}, 
-                                redis_client, http_client, token_manager)
+                                redis_client, http_client, token_manager, session_manager, browser_authenticator)

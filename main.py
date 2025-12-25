@@ -104,6 +104,8 @@ async def init_resources():
         module.redis_client = resources.redis_client
         module.http_client = resources.http_client
         module.token_manager = resources.token_manager
+        module.session_manager = resources.session_manager
+        module.browser_authenticator = resources.browser_authenticator
 
     resources.initialized = True
     logger.info("Server initialization complete")

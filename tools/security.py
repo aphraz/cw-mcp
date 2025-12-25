@@ -14,7 +14,8 @@ from utils.api_client import make_api_request, make_api_request_post
 redis_client = None
 http_client = None  
 token_manager = None
-
+session_manager = None
+browser_authenticator = None
 class AppParams(BaseModel):
     server_id: int
     app_id: int
@@ -44,7 +45,7 @@ async def install_ssl_certificate(ctx: Context, params: SSLCertParam) -> Dict[st
         "app_id": params.app_id,
         "certificate": params.certificate,
         "private_key": params.private_key
-    }, redis_client, http_client, token_manager)
+    }, redis_client, http_client, token_manager, session_manager, browser_authenticator)
 
 @mcp.tool
 async def remove_ssl_certificate(ctx: Context, app: AppParams) -> Dict[str, Any]:
@@ -61,7 +62,7 @@ async def remove_ssl_certificate(ctx: Context, app: AppParams) -> Dict[str, Any]
         "server_id": app.server_id,
         "app_id": app.app_id,
         "_method": "DELETE"
-    }, redis_client, http_client, token_manager)
+    }, redis_client, http_client, token_manager, session_manager, browser_authenticator)
 
 @mcp.tool
 async def install_letsencrypt(ctx: Context, app: AppParams) -> Dict[str, Any]:
@@ -77,7 +78,7 @@ async def install_letsencrypt(ctx: Context, app: AppParams) -> Dict[str, Any]:
     return await make_api_request_post(ctx, "/security/lets_encrypt_install", {
         "server_id": app.server_id,
         "app_id": app.app_id
-    }, redis_client, http_client, token_manager)
+    }, redis_client, http_client, token_manager, session_manager, browser_authenticator)
 
 @mcp.tool
 async def renew_letsencrypt(ctx: Context, app: AppParams) -> Dict[str, Any]:
@@ -93,7 +94,7 @@ async def renew_letsencrypt(ctx: Context, app: AppParams) -> Dict[str, Any]:
     return await make_api_request_post(ctx, "/security/lets_encrypt_manual_renew", {
         "server_id": app.server_id,
         "app_id": app.app_id
-    }, redis_client, http_client, token_manager)
+    }, redis_client, http_client, token_manager, session_manager, browser_authenticator)
 
 class AutoRenewalParam(BaseModel):
     server_id: int
@@ -115,7 +116,7 @@ async def set_letsencrypt_auto_renewal(ctx: Context, params: AutoRenewalParam) -
         "server_id": params.server_id,
         "app_id": params.app_id,
         "auto_renewal": 1 if params.auto_renewal else 0
-    }, redis_client, http_client, token_manager)
+    }, redis_client, http_client, token_manager, session_manager, browser_authenticator)
 
 @mcp.tool
 async def revoke_letsencrypt(ctx: Context, app: AppParams) -> Dict[str, Any]:
@@ -131,7 +132,7 @@ async def revoke_letsencrypt(ctx: Context, app: AppParams) -> Dict[str, Any]:
     return await make_api_request_post(ctx, "/security/lets_encrypt_revoke", {
         "server_id": app.server_id,
         "app_id": app.app_id
-    }, redis_client, http_client, token_manager)
+    }, redis_client, http_client, token_manager, session_manager, browser_authenticator)
 
 @mcp.tool
 async def get_whitelisted_ips_ssh(ctx: Context, server: ServerIdParam) -> Dict[str, Any]:
@@ -146,7 +147,7 @@ async def get_whitelisted_ips_ssh(ctx: Context, server: ServerIdParam) -> Dict[s
     """
     return await make_api_request(ctx, "/security/whitelisted", {
         "server_id": server.server_id
-    }, redis_client, http_client, token_manager)
+    }, redis_client, http_client, token_manager, session_manager, browser_authenticator)
 
 @mcp.tool
 async def get_whitelisted_ips_mysql(ctx: Context, server: ServerIdParam) -> Dict[str, Any]:
@@ -161,7 +162,7 @@ async def get_whitelisted_ips_mysql(ctx: Context, server: ServerIdParam) -> Dict
     """
     return await make_api_request(ctx, "/security/whitelistedIpsMysql", {
         "server_id": server.server_id
-    }, redis_client, http_client, token_manager)
+    }, redis_client, http_client, token_manager, session_manager, browser_authenticator)
 
 class WhitelistIPParam(BaseModel):
     server_id: int
@@ -181,7 +182,7 @@ async def update_whitelisted_ips(ctx: Context, params: WhitelistIPParam) -> Dict
     return await make_api_request_post(ctx, "/security/whitelisted", {
         "server_id": params.server_id,
         "ips": ",".join(params.ips)
-    }, redis_client, http_client, token_manager)
+    }, redis_client, http_client, token_manager, session_manager, browser_authenticator)
 
 class CheckBlacklistParam(BaseModel):
     server_id: int
@@ -201,7 +202,7 @@ async def check_ip_blacklisted(ctx: Context, params: CheckBlacklistParam) -> Dic
     return await make_api_request(ctx, "/security/isBlacklisted", {
         "server_id": params.server_id,
         "ip": params.ip
-    }, redis_client, http_client, token_manager)
+    }, redis_client, http_client, token_manager, session_manager, browser_authenticator)
 
 class AllowIPParam(BaseModel):
     server_id: int
@@ -221,7 +222,7 @@ async def allow_ip_siab(ctx: Context, params: AllowIPParam) -> Dict[str, Any]:
     return await make_api_request_post(ctx, "/security/siab", {
         "server_id": params.server_id,
         "ip": params.ip
-    }, redis_client, http_client, token_manager)
+    }, redis_client, http_client, token_manager, session_manager, browser_authenticator)
 
 @mcp.tool
 async def allow_ip_adminer(ctx: Context, params: AllowIPParam) -> Dict[str, Any]:
@@ -237,7 +238,7 @@ async def allow_ip_adminer(ctx: Context, params: AllowIPParam) -> Dict[str, Any]
     return await make_api_request_post(ctx, "/security/adminer", {
         "server_id": params.server_id,
         "ip": params.ip
-    }, redis_client, http_client, token_manager)
+    }, redis_client, http_client, token_manager, session_manager, browser_authenticator)
 
 # Git SSH Key Management
 @mcp.tool
@@ -254,7 +255,7 @@ async def generate_git_ssh_key(ctx: Context, app: AppParams) -> Dict[str, Any]:
     return await make_api_request_post(ctx, "/git/generateKey", {
         "server_id": app.server_id,
         "app_id": app.app_id
-    }, redis_client, http_client, token_manager)
+    }, redis_client, http_client, token_manager, session_manager, browser_authenticator)
 
 @mcp.tool
 async def get_git_ssh_key(ctx: Context, app: AppParams) -> Dict[str, Any]:
@@ -270,7 +271,7 @@ async def get_git_ssh_key(ctx: Context, app: AppParams) -> Dict[str, Any]:
     return await make_api_request(ctx, "/git/key", {
         "server_id": app.server_id,
         "app_id": app.app_id
-    }, redis_client, http_client, token_manager)
+    }, redis_client, http_client, token_manager, session_manager, browser_authenticator)
 
 class GitCloneParam(BaseModel):
     server_id: int
@@ -294,7 +295,7 @@ async def git_clone(ctx: Context, params: GitCloneParam) -> Dict[str, Any]:
         "app_id": params.app_id,
         "repo_url": params.repo_url,
         "branch": params.branch
-    }, redis_client, http_client, token_manager)
+    }, redis_client, http_client, token_manager, session_manager, browser_authenticator)
 
 @mcp.tool
 async def git_pull(ctx: Context, app: AppParams) -> Dict[str, Any]:
@@ -310,7 +311,7 @@ async def git_pull(ctx: Context, app: AppParams) -> Dict[str, Any]:
     return await make_api_request_post(ctx, "/git/pull", {
         "server_id": app.server_id,
         "app_id": app.app_id
-    }, redis_client, http_client, token_manager)
+    }, redis_client, http_client, token_manager, session_manager, browser_authenticator)
 
 @mcp.tool
 async def get_git_deployment_history(ctx: Context, app: AppParams) -> Dict[str, Any]:
@@ -326,7 +327,7 @@ async def get_git_deployment_history(ctx: Context, app: AppParams) -> Dict[str, 
     return await make_api_request(ctx, "/git/history", {
         "server_id": app.server_id,
         "app_id": app.app_id
-    }, redis_client, http_client, token_manager)
+    }, redis_client, http_client, token_manager, session_manager, browser_authenticator)
 
 @mcp.tool
 async def get_git_branch_names(ctx: Context, app: AppParams) -> Dict[str, Any]:
@@ -342,4 +343,4 @@ async def get_git_branch_names(ctx: Context, app: AppParams) -> Dict[str, Any]:
     return await make_api_request(ctx, "/git/branchNames", {
         "server_id": app.server_id,
         "app_id": app.app_id
-    }, redis_client, http_client, token_manager)
+    }, redis_client, http_client, token_manager, session_manager, browser_authenticator)

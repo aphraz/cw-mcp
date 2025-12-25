@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-API client utilities for Cloudways MCP Server
+API client utilities for Cloudways MCP Server with OAuth browser authentication
 """
 
 from typing import Optional, Dict, Any
@@ -10,7 +10,7 @@ from fastmcp import Context
 import structlog
 
 from config import CLOUDWAYS_API_BASE
-from auth.customer import get_customer_from_headers
+from auth.customer import get_customer_from_session
 from auth.tokens import get_cloudways_token
 from auth.rate_limit import check_rate_limit
 
@@ -19,13 +19,15 @@ logger = structlog.get_logger(__name__)
 async def make_api_request(ctx: Context, endpoint: str, params: Optional[Dict[str, Any]] = None,
                          redis_client: Optional[redis.Redis] = None,
                          http_client: Optional[httpx.AsyncClient] = None,
-                         token_manager = None) -> Dict[str, Any]:
-    """Make authenticated API request to Cloudways"""
+                         token_manager = None,
+                         session_manager = None,
+                         browser_authenticator = None) -> Dict[str, Any]:
+    """Make authenticated API request to Cloudways with OAuth browser authentication"""
     import time
     start_time = time.time()
-    
+
     try:
-        customer = await get_customer_from_headers(ctx, redis_client)
+        customer = await get_customer_from_session(ctx, session_manager, browser_authenticator, redis_client)
         if not customer:
             logger.warning("API request failed - no authentication", endpoint=endpoint)
             return {"status": "error", "message": "Authentication required"}
@@ -91,10 +93,12 @@ async def make_api_request(ctx: Context, endpoint: str, params: Optional[Dict[st
 async def make_api_request_post(ctx: Context, endpoint: str, data: Optional[Dict[str, Any]] = None,
                               redis_client: Optional[redis.Redis] = None,
                               http_client: Optional[httpx.AsyncClient] = None,
-                              token_manager = None) -> Dict[str, Any]:
-    """Make authenticated POST API request to Cloudways"""
+                              token_manager = None,
+                              session_manager = None,
+                              browser_authenticator = None) -> Dict[str, Any]:
+    """Make authenticated POST API request to Cloudways with OAuth browser authentication"""
     try:
-        customer = await get_customer_from_headers(ctx, redis_client)
+        customer = await get_customer_from_session(ctx, session_manager, browser_authenticator, redis_client)
         if not customer:
             return {"status": "error", "message": "Authentication required"}
         

@@ -14,7 +14,8 @@ from utils.api_client import make_api_request, make_api_request_post
 redis_client = None
 http_client = None  
 token_manager = None
-
+session_manager = None
+browser_authenticator = None
 class AppParams(BaseModel):
     server_id: int
     app_id: int
@@ -33,7 +34,7 @@ async def clone_app(ctx: Context, app: AppParams) -> Dict[str, Any]:
     return await make_api_request_post(ctx, "/app/clone", {
         "server_id": app.server_id,
         "app_id": app.app_id
-    }, redis_client, http_client, token_manager)
+    }, redis_client, http_client, token_manager, session_manager, browser_authenticator)
 
 @mcp.tool
 async def backup_app(ctx: Context, app: AppParams) -> Dict[str, Any]:
@@ -49,7 +50,7 @@ async def backup_app(ctx: Context, app: AppParams) -> Dict[str, Any]:
     return await make_api_request_post(ctx, "/app/manage/takeBackup", {
         "server_id": app.server_id,
         "app_id": app.app_id
-    }, redis_client, http_client, token_manager)
+    }, redis_client, http_client, token_manager, session_manager, browser_authenticator)
 
 @mcp.tool
 async def clear_app_cache(ctx: Context, app: AppParams) -> Dict[str, Any]:
@@ -65,7 +66,7 @@ async def clear_app_cache(ctx: Context, app: AppParams) -> Dict[str, Any]:
     return await make_api_request_post(ctx, "/app/cache/purge", {
         "server_id": app.server_id,
         "app_id": app.app_id
-    }, redis_client, http_client, token_manager)
+    }, redis_client, http_client, token_manager, session_manager, browser_authenticator)
 
 @mcp.tool
 async def get_app_backup_status(ctx: Context, app: AppParams) -> Dict[str, Any]:
@@ -81,7 +82,7 @@ async def get_app_backup_status(ctx: Context, app: AppParams) -> Dict[str, Any]:
     return await make_api_request(ctx, "/app/manage/backup", {
         "server_id": app.server_id,
         "app_id": app.app_id
-    }, redis_client, http_client, token_manager)
+    }, redis_client, http_client, token_manager, session_manager, browser_authenticator)
 
 class RestoreAppParam(BaseModel):
     server_id: int
@@ -103,7 +104,7 @@ async def restore_app(ctx: Context, params: RestoreAppParam) -> Dict[str, Any]:
         "server_id": params.server_id,
         "app_id": params.app_id,
         "backup_id": params.backup_id
-    }, redis_client, http_client, token_manager)
+    }, redis_client, http_client, token_manager, session_manager, browser_authenticator)
 
 @mcp.tool
 async def rollback_app_restore(ctx: Context, app: AppParams) -> Dict[str, Any]:
@@ -119,7 +120,7 @@ async def rollback_app_restore(ctx: Context, app: AppParams) -> Dict[str, Any]:
     return await make_api_request_post(ctx, "/app/manage/rollback", {
         "server_id": app.server_id,
         "app_id": app.app_id
-    }, redis_client, http_client, token_manager)
+    }, redis_client, http_client, token_manager, session_manager, browser_authenticator)
 
 class AppCnameParam(BaseModel):
     server_id: int
@@ -141,7 +142,7 @@ async def update_app_cname(ctx: Context, params: AppCnameParam) -> Dict[str, Any
         "server_id": params.server_id,
         "app_id": params.app_id,
         "cname": params.cname
-    }, redis_client, http_client, token_manager)
+    }, redis_client, http_client, token_manager, session_manager, browser_authenticator)
 
 @mcp.tool
 async def delete_app_cname(ctx: Context, app: AppParams) -> Dict[str, Any]:
@@ -159,7 +160,7 @@ async def delete_app_cname(ctx: Context, app: AppParams) -> Dict[str, Any]:
         "server_id": app.server_id,
         "app_id": app.app_id,
         "_method": "DELETE"
-    }, redis_client, http_client, token_manager)
+    }, redis_client, http_client, token_manager, session_manager, browser_authenticator)
 
 @mcp.tool
 async def reset_app_file_permissions(ctx: Context, app: AppParams) -> Dict[str, Any]:
@@ -175,7 +176,7 @@ async def reset_app_file_permissions(ctx: Context, app: AppParams) -> Dict[str, 
     return await make_api_request_post(ctx, "/app/manage/reset_permissions", {
         "server_id": app.server_id,
         "app_id": app.app_id
-    }, redis_client, http_client, token_manager)
+    }, redis_client, http_client, token_manager, session_manager, browser_authenticator)
 
 @mcp.tool
 async def enforce_app_https(ctx: Context, app: AppParams) -> Dict[str, Any]:
@@ -191,7 +192,7 @@ async def enforce_app_https(ctx: Context, app: AppParams) -> Dict[str, Any]:
     return await make_api_request_post(ctx, "/app/manage/enforce_https", {
         "server_id": app.server_id,
         "app_id": app.app_id
-    }, redis_client, http_client, token_manager)
+    }, redis_client, http_client, token_manager, session_manager, browser_authenticator)
 
 @mcp.tool
 async def get_app_fpm_settings(ctx: Context, app: AppParams) -> Dict[str, Any]:
@@ -207,7 +208,7 @@ async def get_app_fpm_settings(ctx: Context, app: AppParams) -> Dict[str, Any]:
     return await make_api_request(ctx, "/app/manage/fpm_setting", {
         "server_id": app.server_id,
         "app_id": app.app_id
-    }, redis_client, http_client, token_manager)
+    }, redis_client, http_client, token_manager, session_manager, browser_authenticator)
 
 @mcp.tool
 async def get_app_varnish_settings(ctx: Context, app: AppParams) -> Dict[str, Any]:
@@ -223,7 +224,7 @@ async def get_app_varnish_settings(ctx: Context, app: AppParams) -> Dict[str, An
     return await make_api_request(ctx, "/app/manage/varnish_setting", {
         "server_id": app.server_id,
         "app_id": app.app_id
-    }, redis_client, http_client, token_manager)
+    }, redis_client, http_client, token_manager, session_manager, browser_authenticator)
 
 @mcp.tool
 async def get_app_varnish_status(ctx: Context, app: AppParams) -> Dict[str, Any]:
@@ -239,7 +240,7 @@ async def get_app_varnish_status(ctx: Context, app: AppParams) -> Dict[str, Any]
     return await make_api_request(ctx, "/service/appVarnish", {
         "server_id": app.server_id,
         "app_id": app.app_id
-    }, redis_client, http_client, token_manager)
+    }, redis_client, http_client, token_manager, session_manager, browser_authenticator)
 
 class AppVarnishParam(BaseModel):
     server_id: int
@@ -261,7 +262,7 @@ async def manage_app_varnish(ctx: Context, params: AppVarnishParam) -> Dict[str,
         "server_id": params.server_id,
         "app_id": params.app_id,
         "state": params.state
-    }, redis_client, http_client, token_manager)
+    }, redis_client, http_client, token_manager, session_manager, browser_authenticator)
 
 @mcp.tool
 async def get_app_analytics_traffic(ctx: Context, app: AppParams) -> Dict[str, Any]:
@@ -277,7 +278,7 @@ async def get_app_analytics_traffic(ctx: Context, app: AppParams) -> Dict[str, A
     return await make_api_request(ctx, "/app/analytics/traffic", {
         "server_id": app.server_id,
         "app_id": app.app_id
-    }, redis_client, http_client, token_manager)
+    }, redis_client, http_client, token_manager, session_manager, browser_authenticator)
 
 @mcp.tool
 async def get_app_analytics_php(ctx: Context, app: AppParams) -> Dict[str, Any]:
@@ -293,7 +294,7 @@ async def get_app_analytics_php(ctx: Context, app: AppParams) -> Dict[str, Any]:
     return await make_api_request(ctx, "/app/analytics/php", {
         "server_id": app.server_id,
         "app_id": app.app_id
-    }, redis_client, http_client, token_manager)
+    }, redis_client, http_client, token_manager, session_manager, browser_authenticator)
 
 @mcp.tool
 async def get_app_analytics_mysql(ctx: Context, app: AppParams) -> Dict[str, Any]:
@@ -309,4 +310,4 @@ async def get_app_analytics_mysql(ctx: Context, app: AppParams) -> Dict[str, Any
     return await make_api_request(ctx, "/app/analytics/mysql", {
         "server_id": app.server_id,
         "app_id": app.app_id
-    }, redis_client, http_client, token_manager)
+    }, redis_client, http_client, token_manager, session_manager, browser_authenticator)
