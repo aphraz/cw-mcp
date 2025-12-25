@@ -156,31 +156,52 @@ except Exception as e:
 
 ## Authentication
 
-The server uses header-based authentication with encrypted credential storage:
+The server uses **OAuth 2.0-style browser authentication** for maximum security - credentials are never stored server-side.
 
-```http
-x-cloudways-email: <your-cloudways-email>
-x-cloudways-api-key: <your-cloudways-api-key>
+### OAuth Browser Authentication Flow
+
+1. **First Connection**: When you first connect to the MCP server, a browser window automatically opens
+2. **Enter Credentials**: Enter your Cloudways email and API key in the secure web form
+3. **Token Generation**: Server exchanges credentials for an access token (valid for 1 hour)
+4. **Token Storage**: Only the encrypted access token is stored server-side
+5. **Automatic Re-auth**: When the token expires, browser reopens for re-authentication
+
+**Key Security Advantage**: Your Cloudways credentials (email + API key) are **never stored** - only short-lived access tokens (1-hour max).
+
+### Authentication Workflow
+
+```
+User Connects → No Session → Browser Opens Automatically →
+User Enters Credentials → Token Generated → Session Active (1 hour) →
+Token Expires → Browser Re-opens → Re-authenticate → Continue
 ```
 
 ### Security Features
-- **Credential Encryption**: API keys encrypted with Fernet before Redis storage
-- **Session Isolation**: Unique customer ID generation prevents session cross-contamination
-- **Token Auto-Renewal**: OAuth token refresh before expiration
-- **Rate Limiting**: Token bucket algorithm (90 requests/60 seconds by default)
-- **Input Validation**: Parameter validation with range checks
-- **Audit Logging**: Request/response logging with structured data
+
+- **Zero Credential Storage**: Credentials used only during token exchange, never cached
+- **Short-lived Tokens**: 1-hour access tokens minimize exposure window
+- **Session Isolation**: Cryptographically secure session IDs (SHA256)
+- **Token Encryption**: All tokens encrypted at rest with Fernet (AES-128)
+- **Rate Limiting**: Protection against brute force (3 attempts/session, 10/IP)
+- **Input Validation**: Email format and API key length validation
+- **Audit Logging**: All authentication events logged with timestamps
 
 ## Configuration Options
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `ENCRYPTION_KEY` | *Required* | Fernet encryption key for credential storage |
+| `ENCRYPTION_KEY` | *Required* | Fernet encryption key for token storage |
 | `REDIS_URL` | `redis://localhost:6379/0` | Redis connection string |
 | `REDIS_POOL_SIZE` | `500` | Redis connection pool size |
 | `HTTP_POOL_SIZE` | `500` | HTTP connection pool size |
 | `RATE_LIMIT_REQUESTS` | `90` | Requests per time window |
 | `RATE_LIMIT_WINDOW` | `60` | Rate limit window (seconds) |
+| `AUTH_BASE_URL` | `http://localhost:7000` | Base URL for OAuth authentication |
+| `AUTH_SESSION_TIMEOUT` | `300` | Session timeout for pending auth (seconds) |
+| `AUTH_POLL_INTERVAL` | `1.0` | Polling interval for auth status (seconds) |
+| `MAX_AUTH_ATTEMPTS_PER_SESSION` | `3` | Max auth attempts per session |
+| `MAX_AUTH_ATTEMPTS_PER_IP` | `10` | Max auth attempts per IP |
+| `AUTH_LOCKOUT_DURATION` | `300` | Lockout duration after max attempts (seconds) |
 | `LOG_LEVEL` | `INFO` | Logging verbosity |
 | `LOG_FORMAT` | `console` | Log format (console/json) |
 
