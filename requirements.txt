@@ -8,3 +8,5 @@ uvicorn[standard]  # Includes uvloop and httptools for better performance
 python-dotenv
 fastapi
 gunicorn  # Production WSGI server
+jinja2  # HTML template rendering for OAuth auth pages
+python-multipart  # Form data parsing for auth endpoints

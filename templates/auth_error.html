@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Authentication Error</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #f44 0%, #c33 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 500px;
+            width: 100%;
+            padding: 60px 40px;
+            text-align: center;
+        }
+
+        .error-icon {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #f44 0%, #c33 100%);
+            border-radius: 50%;
+            margin: 0 auto 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: shake 0.5s ease;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-10px); }
+            20%, 40%, 60%, 80% { transform: translateX(10px); }
+        }
+
+        .error-icon::before {
+            content: '!';
+            color: white;
+            font-size: 48px;
+            font-weight: bold;
+        }
+
+        h1 {
+            color: #c33;
+            font-size: 32px;
+            margin-bottom: 15px;
+        }
+
+        .message {
+            color: #666;
+            font-size: 16px;
+            line-height: 1.6;
+            margin-bottom: 30px;
+        }
+
+        .error-details {
+            background: #fee;
+            border-radius: 8px;
+            border: 2px solid #fcc;
+            padding: 20px;
+            margin-bottom: 30px;
+            text-align: left;
+        }
+
+        .error-details h3 {
+            color: #c33;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        .error-details p {
+            color: #666;
+            font-size: 14px;
+            line-height: 1.6;
+            margin: 0;
+        }
+
+        .error-details code {
+            background: #fcc;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 13px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .retry-button {
+            display: inline-block;
+            padding: 14px 32px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .retry-button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .retry-button:active {
+            transform: translateY(0);
+        }
+
+        .help-text {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f5f5f5;
+            border-radius: 8px;
+            text-align: left;
+        }
+
+        .help-text h3 {
+            color: #333;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        .help-text ul {
+            color: #666;
+            font-size: 14px;
+            line-height: 1.8;
+            margin-left: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="error-icon"></div>
+
+        <h1>Authentication Failed</h1>
+
+        <p class="message">
+            We couldn't authenticate your Cloudways credentials.
+            Please check your information and try again.
+        </p>
+
+        <div class="error-details">
+            <h3>Error Details</h3>
+            <p id="errorMessage">{{ error_message or 'Invalid credentials or network error.' }}</p>
+        </div>
+
+        {% if retry_url %}
+        <a href="{{ retry_url }}" class="retry-button">Try Again</a>
+        {% else %}
+        <a href="javascript:history.back()" class="retry-button">Try Again</a>
+        {% endif %}
+
+        <div class="help-text">
+            <h3>Troubleshooting</h3>
+            <ul>
+                <li>Verify your email address is correct</li>
+                <li>Check that your API key is valid and not expired</li>
+                <li>Ensure you have network connectivity</li>
+                <li>Try generating a new API key from Cloudways dashboard</li>
+                <li>Contact support if the problem persists</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>
