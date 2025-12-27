@@ -225,9 +225,6 @@ if oauth_routes:
 else:
     logger.warning(f"get_routes() returned: {type(oauth_routes)}")
 
-# Mount the MCP app (MCP protocol endpoint at /mcp/mcp)
-app.mount("/mcp", mcp_app)
-
 # Manually add /register endpoint (FastMCP doesn't create it automatically)
 @app.post("/register")
 async def register_client(request: Request):
@@ -890,6 +887,12 @@ async def oauth_protected_resource(request: Request, path: str = None):
         "scopes_supported": ["cloudways:api"],
         "bearer_methods_supported": ["header"]
     }
+
+
+# ==================== Mount MCP App ====================
+# Mount at root to serve MCP protocol at /mcp (not /mcp/mcp)
+# All explicit routes above are registered first and take precedence
+app.mount("/", mcp_app)
 
 
 def main():
