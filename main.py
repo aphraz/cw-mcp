@@ -777,19 +777,25 @@ async def token_endpoint(
 
     # Get session and customer data
     session_id = code_data["session_id"]
-    session = await resources.session_manager.get_session(session_id)
+    customer_id = code_data.get("customer_id")  # Extract customer_id for session binding
+
+    # Get session with customer_id for security (MCP session binding requirement)
+    session = await resources.session_manager.get_session(session_id, customer_id)
 
     if not session or not session.is_authenticated():
         return JSONResponse(
             status_code=400,
             content={
                 "error": "invalid_grant",
-                "error_description": "Session not authenticated"
+                "error_description": "Session not authenticated or invalid"
             }
         )
 
-    # Get Cloudways token
-    cloudways_token_key = f"session:{session_id}:cloudways_token"
+    # Get Cloudways token (customer-bound key for authenticated sessions)
+    if customer_id:
+        cloudways_token_key = f"session:{customer_id}:{session_id}:cloudways_token"
+    else:
+        cloudways_token_key = f"session:{session_id}:cloudways_token"
     encrypted_cloudways_token = await resources.redis_client.get(cloudways_token_key)
 
     if not encrypted_cloudways_token:
