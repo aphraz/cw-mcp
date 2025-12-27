@@ -8,7 +8,7 @@ from fastmcp import Context
 from pydantic import BaseModel
 
 from server import mcp
-from auth.customer import get_customer_from_session
+from auth.customer import get_customer
 from auth.rate_limit import get_rate_limit_status
 from auth.oauth_error import OAuthErrorResponse
 from utils.api_client import make_api_request
@@ -31,7 +31,7 @@ class AppParams(BaseModel):
 async def ping(ctx: Context) -> Dict[str, Any]:
     """Test connectivity and authentication"""
     try:
-        customer = await get_customer_from_session(ctx, session_manager, browser_authenticator, redis_client)
+        customer = await get_customer(ctx, session_manager, browser_authenticator, redis_client)
         if customer:
             return {"status": "success", "message": f"Pong! Authenticated as {customer.cloudways_email}"}
         else:
@@ -44,7 +44,7 @@ async def ping(ctx: Context) -> Dict[str, Any]:
 async def customer_info(ctx: Context) -> Dict[str, Any]:
     """Get current customer information"""
     try:
-        customer = await get_customer_from_session(ctx, session_manager, browser_authenticator, redis_client)
+        customer = await get_customer(ctx, session_manager, browser_authenticator, redis_client)
         if not customer:
             return {"status": "error", "message": "Authentication required"}
 
@@ -64,7 +64,7 @@ async def customer_info(ctx: Context) -> Dict[str, Any]:
 async def rate_limit_status(ctx: Context) -> Dict[str, Any]:
     """Get current rate limit status"""
     try:
-        customer = await get_customer_from_session(ctx, session_manager, browser_authenticator, redis_client)
+        customer = await get_customer(ctx, session_manager, browser_authenticator, redis_client)
         if not customer:
             return {"status": "error", "message": "Authentication required"}
 
