@@ -96,11 +96,18 @@ class SessionManager:
     """
     Manages authentication sessions with Redis storage.
 
-    Redis key structure:
-        session:{session_id}:data      - Session metadata (JSON)
-        session:{session_id}:status    - Quick status lookup
-        session:{session_id}:token     - Encrypted access token
-        session:{session_id}:token_meta - Token metadata (expiry, etc.)
+    Redis key structure (MCP Security Best Practice - User Binding):
+        Pending sessions (no customer_id yet):
+            session:{session_id}:data      - Session metadata (JSON)
+            session:{session_id}:status    - Quick status lookup
+
+        Authenticated sessions (bound to customer for security):
+            session:{customer_id}:{session_id}:data      - Session metadata (JSON)
+            session:{customer_id}:{session_id}:status    - Quick status lookup
+            session:{customer_id}:{session_id}:token     - Encrypted access token
+            session:{customer_id}:{session_id}:token_meta - Token metadata (expiry, etc.)
+
+    This prevents session hijacking: attacker needs BOTH customer_id AND session_id.
     """
 
     def __init__(self, redis_client: redis.Redis):
@@ -157,26 +164,85 @@ class SessionManager:
 
         return session
 
-    async def get_session(self, session_id: str) -> Optional[AuthSession]:
+    async def get_session(self, session_id: str, customer_id: Optional[str] = None) -> Optional[AuthSession]:
         """
-        Retrieve a session by ID.
+        Retrieve a session by ID with optional customer validation.
 
         Args:
             session_id: Session identifier
+            customer_id: Optional customer ID for validation (recommended for security)
 
         Returns:
             AuthSession if found, None otherwise
+
+        Security Note:
+            If customer_id is provided, it validates that the session belongs to
+            that customer, preventing session hijacking even if session_id is stolen.
         """
+        # Try customer-bound key first if customer_id provided (authenticated sessions)
+        if customer_id:
+            data_key = f"session:{customer_id}:{session_id}:data"
+            session_data = await self.redis_client.get(data_key)
+
+            if session_data:
+                try:
+                    data = json.loads(session_data)
+                    session = AuthSession.from_dict(data)
+
+                    # Validate customer_id matches
+                    if session.customer_id and session.customer_id != customer_id:
+                        logger.warning(
+                            "Session customer_id mismatch",
+                            session_id=session_id,
+                            expected=customer_id,
+                            actual=session.customer_id
+                        )
+                        return None
+
+                    # Update last activity
+                    session.last_activity = datetime.now(timezone.utc)
+                    await self._store_session(session)
+
+                    logger.debug(
+                        "Session retrieved (customer-bound)",
+                        session_id=session_id,
+                        customer_id=customer_id,
+                        status=session.auth_status.value
+                    )
+
+                    return session
+
+                except (json.JSONDecodeError, KeyError, ValueError) as e:
+                    logger.error(
+                        "Failed to deserialize session",
+                        session_id=session_id,
+                        error=str(e)
+                    )
+                    return None
+
+        # Fallback to session-only key (pending sessions or migration path)
         data_key = f"session:{session_id}:data"
         session_data = await self.redis_client.get(data_key)
 
         if not session_data:
-            logger.debug("Session not found", session_id=session_id)
+            logger.debug("Session not found", session_id=session_id, customer_id=customer_id)
             return None
 
         try:
             data = json.loads(session_data)
             session = AuthSession.from_dict(data)
+
+            # If this is an authenticated session without customer binding, migrate it
+            if session.customer_id and session.auth_status == AuthStatus.AUTHENTICATED:
+                logger.info(
+                    "Migrating session to customer-bound storage",
+                    session_id=session_id,
+                    customer_id=session.customer_id
+                )
+                # Delete old key
+                await self.redis_client.delete(data_key)
+                # Store with new customer-bound key
+                await self._store_session(session)
 
             # Update last activity
             session.last_activity = datetime.now(timezone.utc)
@@ -275,25 +341,39 @@ class SessionManager:
 
         logger.info("Session marked as expired", session_id=session_id)
 
-    async def delete_session(self, session_id: str) -> None:
+    async def delete_session(self, session_id: str, customer_id: Optional[str] = None) -> None:
         """
         Delete a session and all associated data.
 
         Args:
             session_id: Session identifier
+            customer_id: Optional customer ID (for customer-bound sessions)
         """
-        keys_to_delete = [
+        # Try to delete customer-bound keys first if customer_id provided
+        keys_to_delete = []
+
+        if customer_id:
+            keys_to_delete.extend([
+                f"session:{customer_id}:{session_id}:data",
+                f"session:{customer_id}:{session_id}:status",
+                f"session:{customer_id}:{session_id}:token",
+                f"session:{customer_id}:{session_id}:token_meta"
+            ])
+
+        # Also delete legacy session-only keys (migration/fallback)
+        keys_to_delete.extend([
             f"session:{session_id}:data",
             f"session:{session_id}:status",
             f"session:{session_id}:token",
             f"session:{session_id}:token_meta"
-        ]
+        ])
 
         deleted = await self.redis_client.delete(*keys_to_delete)
 
         logger.info(
             "Session deleted",
             session_id=session_id,
+            customer_id=customer_id,
             keys_deleted=deleted
         )
 
@@ -334,14 +414,25 @@ class SessionManager:
 
     async def _store_session(self, session: AuthSession, ttl: Optional[int] = None) -> None:
         """
-        Store session data in Redis.
+        Store session data in Redis with user binding for authenticated sessions.
 
         Args:
             session: Session to store
             ttl: Time to live in seconds
+
+        Note:
+            - Pending sessions: stored as session:{session_id}:*
+            - Authenticated sessions: stored as session:{customer_id}:{session_id}:*
+            This implements MCP security best practice to prevent session hijacking.
         """
-        data_key = f"session:{session.session_id}:data"
-        status_key = f"session:{session.session_id}:status"
+        # Use customer-bound keys for authenticated sessions (security requirement)
+        if session.customer_id and session.auth_status == AuthStatus.AUTHENTICATED:
+            data_key = f"session:{session.customer_id}:{session.session_id}:data"
+            status_key = f"session:{session.customer_id}:{session.session_id}:status"
+        else:
+            # Pending sessions don't have customer_id yet
+            data_key = f"session:{session.session_id}:data"
+            status_key = f"session:{session.session_id}:status"
 
         session_data = json.dumps(session.to_dict())
 
