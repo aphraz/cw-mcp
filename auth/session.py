@@ -170,16 +170,16 @@ class SessionManager:
 
         Args:
             session_id: Session identifier
-            customer_id: Optional customer ID for validation (recommended for security)
+            customer_id: Optional customer ID for validation (required for authenticated sessions)
 
         Returns:
             AuthSession if found, None otherwise
 
         Security Note:
-            If customer_id is provided, it validates that the session belongs to
-            that customer, preventing session hijacking even if session_id is stolen.
+            For authenticated sessions, customer_id is required to prevent session hijacking.
+            Only pending sessions can be retrieved without customer_id.
         """
-        # Try customer-bound key first if customer_id provided (authenticated sessions)
+        # For authenticated sessions, try customer-bound key
         if customer_id:
             data_key = f"session:{customer_id}:{session_id}:data"
             session_data = await self.redis_client.get(data_key)
@@ -190,9 +190,9 @@ class SessionManager:
                     session = AuthSession.from_dict(data)
 
                     # Validate customer_id matches
-                    if session.customer_id and session.customer_id != customer_id:
+                    if session.customer_id != customer_id:
                         logger.warning(
-                            "Session customer_id mismatch",
+                            "Session customer_id mismatch - possible hijacking attempt",
                             session_id=session_id,
                             expected=customer_id,
                             actual=session.customer_id
@@ -220,36 +220,35 @@ class SessionManager:
                     )
                     return None
 
-        # Fallback to session-only key (pending sessions or migration path)
+        # Session-only key for pending sessions (no customer_id yet)
         data_key = f"session:{session_id}:data"
         session_data = await self.redis_client.get(data_key)
 
         if not session_data:
-            logger.debug("Session not found", session_id=session_id, customer_id=customer_id)
+            logger.debug("Session not found", session_id=session_id)
             return None
 
         try:
             data = json.loads(session_data)
             session = AuthSession.from_dict(data)
 
-            # If this is an authenticated session without customer binding, migrate it
-            if session.customer_id and session.auth_status == AuthStatus.AUTHENTICATED:
-                logger.info(
-                    "Migrating session to customer-bound storage",
+            # Authenticated sessions MUST use customer-bound keys
+            if session.auth_status == AuthStatus.AUTHENTICATED and session.customer_id:
+                logger.error(
+                    "Authenticated session found without customer binding - security violation",
                     session_id=session_id,
                     customer_id=session.customer_id
                 )
-                # Delete old key
+                # Delete invalid session
                 await self.redis_client.delete(data_key)
-                # Store with new customer-bound key
-                await self._store_session(session)
+                return None
 
-            # Update last activity
+            # Update last activity for pending sessions
             session.last_activity = datetime.now(timezone.utc)
             await self._store_session(session)
 
             logger.debug(
-                "Session retrieved",
+                "Session retrieved (pending)",
                 session_id=session_id,
                 status=session.auth_status.value
             )
@@ -347,26 +346,26 @@ class SessionManager:
 
         Args:
             session_id: Session identifier
-            customer_id: Optional customer ID (for customer-bound sessions)
-        """
-        # Try to delete customer-bound keys first if customer_id provided
-        keys_to_delete = []
+            customer_id: Customer ID (None for pending sessions, required for authenticated)
 
+        Note:
+            - Pending/unauthenticated sessions: session:{session_id}:* keys
+            - Authenticated sessions: session:{customer_id}:{session_id}:* keys
+        """
         if customer_id:
-            keys_to_delete.extend([
+            # Authenticated session - customer-bound keys (MCP security requirement)
+            keys_to_delete = [
                 f"session:{customer_id}:{session_id}:data",
                 f"session:{customer_id}:{session_id}:status",
                 f"session:{customer_id}:{session_id}:token",
                 f"session:{customer_id}:{session_id}:token_meta"
-            ])
-
-        # Also delete legacy session-only keys (migration/fallback)
-        keys_to_delete.extend([
-            f"session:{session_id}:data",
-            f"session:{session_id}:status",
-            f"session:{session_id}:token",
-            f"session:{session_id}:token_meta"
-        ])
+            ]
+        else:
+            # Pending session - session-only keys (not yet authenticated)
+            keys_to_delete = [
+                f"session:{session_id}:data",
+                f"session:{session_id}:status"
+            ]
 
         deleted = await self.redis_client.delete(*keys_to_delete)
 
