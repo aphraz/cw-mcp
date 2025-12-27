@@ -30,13 +30,19 @@ _global_oauth_provider = None
 
 class Customer:
     def __init__(self, customer_id: str, email: str, cloudways_email: str,
-                 cloudways_api_key: str, created_at: datetime, session_id: Optional[str] = None):
+                 created_at: datetime,
+                 auth_method: str,
+                 session_id: Optional[str] = None,
+                 cloudways_api_key: Optional[str] = None,
+                 cloudways_oauth_token: Optional[str] = None):
         self.customer_id = customer_id
         self.email = email
         self.cloudways_email = cloudways_email
-        self.cloudways_api_key = cloudways_api_key
+        self.auth_method = auth_method  # "headers", "bearer", or "oauth"
         self.session_id = session_id  # For OAuth session-based authentication
-        self.created_at = datetime.now(timezone.utc)
+        self.cloudways_api_key = cloudways_api_key  # Permanent API key (header-based only)
+        self.cloudways_oauth_token = cloudways_oauth_token  # OAuth access token (bearer/session)
+        self.created_at = created_at
         self.last_seen = datetime.now(timezone.utc)
 
 async def get_customer_from_headers(ctx: Context, redis_client: Optional[redis.Redis] = None) -> Optional[Customer]:
@@ -83,8 +89,9 @@ async def get_customer_from_headers(ctx: Context, redis_client: Optional[redis.R
                         customer_id=customer_id,
                         email=data["email"],
                         cloudways_email=data["cloudways_email"],
-                        cloudways_api_key=decrypted_key,
-                        created_at=datetime.fromisoformat(data["created_at"])
+                        created_at=datetime.fromisoformat(data["created_at"]),
+                        auth_method="headers",
+                        cloudways_api_key=decrypted_key
                     )
                     logger.debug("Customer loaded from cache", customer_id=customer_id, customer_email=customer.email)
                     return customer
@@ -92,7 +99,14 @@ async def get_customer_from_headers(ctx: Context, redis_client: Optional[redis.R
                 logger.warning("Failed to load customer from cache", error=str(e))
         
         # Create new customer
-        customer = Customer(customer_id, email, email, api_key, datetime.now(timezone.utc))
+        customer = Customer(
+            customer_id=customer_id,
+            email=email,
+            cloudways_email=email,
+            created_at=datetime.now(timezone.utc),
+            auth_method="headers",
+            cloudways_api_key=api_key
+        )
         await _cache_customer(customer, redis_client)
         logger.info("New customer created", customer_id=customer_id, customer_email=customer.email)
         
@@ -183,9 +197,10 @@ async def get_customer_from_session(
                         customer_id=customer_id,
                         email=customer_email,
                         cloudways_email=customer_email,
-                        cloudways_api_key=cloudways_token,
                         created_at=datetime.now(timezone.utc),
-                        session_id=None
+                        auth_method="bearer",
+                        session_id=None,
+                        cloudways_oauth_token=cloudways_token
                     )
                     logger.debug("Authenticated via bearer token", customer_id=customer_id)
                     return customer
@@ -274,8 +289,8 @@ async def get_customer_from_session(
             customer_id=session.customer_id,
             email=session.customer_email,
             cloudways_email=session.customer_email,
-            cloudways_api_key="<token-based>",  # Not stored in OAuth flow
             created_at=session.created_at,
+            auth_method="oauth",
             session_id=session_id
         )
 

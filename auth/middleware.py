@@ -61,11 +61,19 @@ class OAuthMiddleware(BaseHTTPMiddleware):
         if request.method == "GET":
             return await call_next(request)
 
-        # Check for header-based authentication first (fallback for Claude Desktop)
+        # Check for header-based authentication first (if enabled)
+        from config import ENABLE_HEADER_AUTH, ENABLE_OAUTH_AUTH
+
         email = request.headers.get("x-cloudways-email")
         api_key = request.headers.get("x-cloudways-api-key")
 
         if email and api_key:
+            if not ENABLE_HEADER_AUTH:
+                logger.warning("Header-based auth disabled", email=email)
+                return self._create_401_response(
+                    "header_auth_disabled",
+                    "Header-based authentication is disabled. Please use OAuth authentication."
+                )
             # Header-based authentication - bypass OAuth for compatibility
             logger.debug("Using header-based authentication", email=email)
             request.state.authenticated = True
@@ -74,12 +82,20 @@ class OAuthMiddleware(BaseHTTPMiddleware):
             request.state.cloudways_api_key = api_key
             return await call_next(request)
 
-        # Extract Authorization header
+        # Extract Authorization header for OAuth/bearer token auth
         auth_header = request.headers.get("Authorization", "")
 
         if not auth_header:
             logger.info("MCP request without Authorization header", path=request.url.path)
             return self._create_401_response("authorization_required")
+
+        # Check if OAuth authentication is enabled
+        if not ENABLE_OAUTH_AUTH:
+            logger.warning("OAuth auth disabled")
+            return self._create_401_response(
+                "oauth_auth_disabled",
+                "OAuth authentication is disabled. Please use header-based authentication."
+            )
 
         # Parse Bearer token
         parts = auth_header.split()

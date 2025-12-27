@@ -135,46 +135,49 @@ class TokenManager:
 
     async def get_token(self, customer: Customer) -> str:
         """
-        Get token using Customer object - supports both OAuth and header-based auth.
+        Get token using Customer object - supports all authentication modes.
 
-        For OAuth (session-based):
-        - Requires customer.session_id
-        - Retrieves token from session storage
-        - No auto-renewal
-
-        For header-based auth (credential-based):
-        - Requires customer.cloudways_email and customer.cloudways_api_key
-        - Exchanges credentials for OAuth token
-        - Auto-renews when near expiry
-        - Caches by customer_id
+        Routes to appropriate handler based on customer.auth_method:
+        - "headers": Exchange permanent API key for OAuth token with auto-renewal
+        - "bearer": Return OAuth token directly from customer object
+        - "oauth": Retrieve token from session storage (no auto-renewal)
 
         Args:
-            customer: Customer object (with session_id OR email+api_key)
+            customer: Customer object with auth_method set
 
         Returns:
-            Decrypted access token
+            Cloudways OAuth access token
 
         Raises:
             ValueError: If customer lacks required attributes
             SessionNotFoundError: Session or token not found
             TokenExpiredError: Token has expired
+            RuntimeError: If token exchange/renewal fails
         """
-        # Detect header-based auth (has email and API key)
-        is_header_auth = (
-            hasattr(customer, 'cloudways_email') and customer.cloudways_email and
-            hasattr(customer, 'cloudways_api_key') and customer.cloudways_api_key and
-            customer.cloudways_api_key not in ["<token-based>", "<token-missing>"]
-        )
+        auth_method = getattr(customer, 'auth_method', None)
 
-        if is_header_auth:
-            # Header-based auth: use customer_id-based token with auto-renewal
+        if auth_method == "headers":
+            # Header-based: exchange permanent API key for OAuth token with auto-renewal
+            if not customer.cloudways_api_key:
+                raise ValueError("Header-based auth requires cloudways_api_key")
             return await self._get_token_with_renewal(customer)
 
-        # OAuth mode: use session-based token (no renewal)
-        if not hasattr(customer, 'session_id') or not customer.session_id:
-            raise ValueError("Customer object missing session_id for OAuth authentication")
+        elif auth_method == "bearer":
+            # Bearer token: OAuth token already in customer object
+            if customer.cloudways_oauth_token and customer.cloudways_oauth_token not in ["<token-missing>"]:
+                logger.debug("Using OAuth token from bearer token auth",
+                           customer_id=customer.customer_id)
+                return customer.cloudways_oauth_token
+            raise ValueError("Bearer token auth missing cloudways_oauth_token")
 
-        return await self.get_token_from_session(customer.session_id)
+        elif auth_method == "oauth":
+            # OAuth session: retrieve token from session storage (no auto-renewal)
+            if not customer.session_id:
+                raise ValueError("OAuth session auth requires session_id")
+            return await self.get_token_from_session(customer.session_id)
+
+        else:
+            raise ValueError(f"Unknown auth_method: {auth_method}")
 
     async def _get_token_with_renewal(self, customer: Customer) -> str:
         """
@@ -367,14 +370,13 @@ async def get_cloudways_token(
     """
     Get Cloudways OAuth access token for customer.
 
-    Supports both authentication modes:
-    - OAuth (session-based): Retrieves token from session storage
-    - Header-based (credential-based): Exchanges email+API key for token with auto-renewal
-
-    The TokenManager automatically detects which mode based on customer attributes.
+    Supports all authentication modes via customer.auth_method:
+    - "headers": Exchanges permanent API key for OAuth token with auto-renewal
+    - "bearer": Returns OAuth token from customer object
+    - "oauth": Retrieves token from session storage
 
     Args:
-        customer: Customer object (with session_id OR email+api_key)
+        customer: Customer object with auth_method set
         token_manager: TokenManager instance
         redis_client: Redis client (deprecated - use token_manager)
         http_client: HTTP client (deprecated - use token_manager)
@@ -383,16 +385,16 @@ async def get_cloudways_token(
         Cloudways OAuth access token string
 
     Raises:
-        ValueError: If customer lacks required attributes
+        ValueError: If customer lacks required attributes or token_manager is missing
         SessionNotFoundError: If session/token not found
         TokenExpiredError: If token has expired
         RuntimeError: If token exchange/renewal fails
     """
     if token_manager:
-        # TokenManager handles both OAuth and header-based auth automatically
+        # TokenManager routes to appropriate handler based on customer.auth_method
         return await token_manager.get_token(customer)
 
-    # Fallback: Direct session token retrieval (OAuth mode only)
+    # Fallback: Direct session token retrieval (OAuth mode only) - deprecated
     if hasattr(customer, 'session_id') and customer.session_id:
         if not redis_client:
             raise ValueError("Redis client required for token retrieval")
@@ -405,7 +407,7 @@ async def get_cloudways_token(
                 from config import fernet
                 decrypted_token = fernet.decrypt(cached_token.encode()).decode()
                 logger.debug(
-                    "Retrieved token from session",
+                    "Retrieved token from session (fallback)",
                     session_id=customer.session_id
                 )
                 return decrypted_token
@@ -417,6 +419,4 @@ async def get_cloudways_token(
                 )
                 raise SessionNotFoundError(customer.session_id)
 
-    raise ValueError(
-        "Customer object missing required attributes (session_id for OAuth or email+api_key for header-based auth)"
-    )
+    raise ValueError("TokenManager required for token retrieval")

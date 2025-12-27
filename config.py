@@ -40,6 +40,10 @@ MAX_AUTH_ATTEMPTS_PER_SESSION = int(os.getenv("MAX_AUTH_ATTEMPTS_PER_SESSION", "
 MAX_AUTH_ATTEMPTS_PER_IP = int(os.getenv("MAX_AUTH_ATTEMPTS_PER_IP", "10"))
 AUTH_LOCKOUT_DURATION = int(os.getenv("AUTH_LOCKOUT_DURATION", "300"))  # 5 minutes
 
+# Authentication Method Toggles
+ENABLE_HEADER_AUTH = os.getenv("ENABLE_HEADER_AUTH", "true").lower() == "true"
+ENABLE_OAUTH_AUTH = os.getenv("ENABLE_OAUTH_AUTH", "true").lower() == "true"
+
 # Logging Configuration
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 LOG_FORMAT = os.getenv("LOG_FORMAT", "console")  # console, json
