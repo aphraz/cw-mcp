@@ -238,55 +238,17 @@
     </div>
 
     <script>
+        // Use normal form submission (no fetch) so browser follows cross-origin redirects
         const form = document.getElementById('authForm');
         const submitBtn = document.getElementById('submitBtn');
         const loading = document.getElementById('loading');
         const errorBox = document.getElementById('errorBox');
-        const errorMessage = document.getElementById('errorMessage');
 
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-
-            // Hide error box
+        form.addEventListener('submit', () => {
+            // Hide error box and show loading state before native submit
             errorBox.style.display = 'none';
-
-            // Show loading state
             submitBtn.disabled = true;
             loading.classList.add('active');
-
-            try {
-                const formData = new FormData(form);
-                const response = await fetch('/auth/submit', {
-                    method: 'POST',
-                    body: new URLSearchParams(formData),
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded'
-                    }
-                });
-
-                const data = await response.json();
-
-                if (response.ok && data.status === 'success') {
-                    // Success! Redirect to success page
-                    window.location.href = '/auth/success';
-                } else {
-                    // Show error
-                    errorMessage.textContent = data.message || 'Authentication failed. Please check your credentials.';
-                    errorBox.style.display = 'block';
-
-                    // Reset form state
-                    submitBtn.disabled = false;
-                    loading.classList.remove('active');
-                }
-            } catch (error) {
-                console.error('Authentication error:', error);
-                errorMessage.textContent = 'Network error. Please check your connection and try again.';
-                errorBox.style.display = 'block';
-
-                // Reset form state
-                submitBtn.disabled = false;
-                loading.classList.remove('active');
-            }
         });
     </script>
 </body>

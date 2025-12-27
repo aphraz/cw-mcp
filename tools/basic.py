@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from server import mcp
 from auth.customer import get_customer_from_session
 from auth.rate_limit import get_rate_limit_status
+from auth.oauth_error import OAuthErrorResponse
 from utils.api_client import make_api_request
 
 # Shared components (will be injected by main.py)
@@ -27,38 +28,49 @@ class AppParams(BaseModel):
     app_id: int
 
 @mcp.tool
-async def ping(ctx: Context) -> str:
+async def ping(ctx: Context) -> Dict[str, Any]:
     """Test connectivity and authentication"""
-    customer = await get_customer_from_session(ctx, session_manager, browser_authenticator, redis_client)
-    if customer:
-        return f"Pong! Authenticated as {customer.cloudways_email}"
-    else:
-        return "Pong! No authentication provided."
+    try:
+        customer = await get_customer_from_session(ctx, session_manager, browser_authenticator, redis_client)
+        if customer:
+            return {"status": "success", "message": f"Pong! Authenticated as {customer.cloudways_email}"}
+        else:
+            return {"status": "success", "message": "Pong! No authentication provided."}
+    except OAuthErrorResponse as e:
+        # Return OAuth error dictionary - MCP client will interpret this
+        return e.oauth_error.to_dict()
 
 @mcp.tool
 async def customer_info(ctx: Context) -> Dict[str, Any]:
     """Get current customer information"""
-    customer = await get_customer_from_session(ctx, session_manager, browser_authenticator, redis_client)
-    if not customer:
-        return {"status": "error", "message": "Authentication required"}
+    try:
+        customer = await get_customer_from_session(ctx, session_manager, browser_authenticator, redis_client)
+        if not customer:
+            return {"status": "error", "message": "Authentication required"}
 
-    return {
-        "customer_id": customer.customer_id,
-        "email": customer.email,
-        "cloudways_email": customer.cloudways_email,
-        "session_id": customer.session_id,
-        "created_at": customer.created_at.isoformat(),
-        "last_seen": customer.last_seen.isoformat()
-    }
+        return {
+            "status": "success",
+            "customer_id": customer.customer_id,
+            "email": customer.email,
+            "cloudways_email": customer.cloudways_email,
+            "session_id": customer.session_id,
+            "created_at": customer.created_at.isoformat(),
+            "last_seen": customer.last_seen.isoformat()
+        }
+    except OAuthErrorResponse as e:
+        return e.oauth_error.to_dict()
 
 @mcp.tool
 async def rate_limit_status(ctx: Context) -> Dict[str, Any]:
     """Get current rate limit status"""
-    customer = await get_customer_from_session(ctx, session_manager, browser_authenticator, redis_client)
-    if not customer:
-        return {"status": "error", "message": "Authentication required"}
+    try:
+        customer = await get_customer_from_session(ctx, session_manager, browser_authenticator, redis_client)
+        if not customer:
+            return {"status": "error", "message": "Authentication required"}
 
-    return await get_rate_limit_status(customer.customer_id, redis_client)
+        return await get_rate_limit_status(customer.customer_id, redis_client)
+    except OAuthErrorResponse as e:
+        return e.oauth_error.to_dict()
 
 @mcp.tool
 async def list_servers(ctx: Context) -> Dict[str, Any]:

@@ -16,8 +16,17 @@ from config import fernet, AUTH_BASE_URL
 from auth.exceptions import TokenExpiredError, SessionNotFoundError
 from auth.session import SessionManager, AuthStatus
 from auth.browser_flow import BrowserAuthenticator, initiate_browser_auth, initiate_re_authentication
+from auth.oauth_error import (
+    OAuthErrorResponse,
+    create_authorization_required_error,
+    create_token_expired_error,
+    create_authentication_pending_error
+)
 
 logger = structlog.get_logger(__name__)
+
+# Module-level global for oauth_provider (set during initialization)
+_global_oauth_provider = None
 
 class Customer:
     def __init__(self, customer_id: str, email: str, cloudways_email: str,
@@ -133,79 +142,120 @@ async def get_customer_from_session(
         TokenExpiredError: If token expired and re-auth failed
     """
     try:
-        # Extract session_id from context or generate new one
-        http_request = get_http_request()
-        session_id = (
-            getattr(ctx, 'session_id', None) or
-            http_request.headers.get('x-mcp-session-id') or
-            http_request.headers.get('x-session-id')
-        )
+        # Extract session_id from cookie, context, or headers (in priority order)
+        try:
+            http_request = get_http_request()
+        except Exception as e:
+            logger.warning(f"get_http_request() failed: {e}")
+            http_request = None
 
+
+        # Short-circuit: if a valid Bearer token is present, trust it and avoid browser re-auth
+        auth_header = http_request.headers.get("Authorization") if http_request else None
+        if auth_header and auth_header.lower().startswith("bearer "):
+            bearer_token = auth_header.split()[1]
+
+            # Try global provider first, then fall back to resources
+            global _global_oauth_provider
+            provider = _global_oauth_provider
+            if not provider:
+                try:
+                    from main import resources
+                    provider = getattr(resources, "oauth_provider", None)
+                except Exception as e:
+                    logger.error(f"Failed to get OAuth provider: {e}")
+                    provider = None
+
+            if provider:
+                token_obj = await provider.load_access_token(bearer_token)
+                if token_obj:
+                    # Construct customer from bearer token claims
+                    customer_id = token_obj.customer_id or token_obj.user_id or "unknown"
+                    customer_email = token_obj.customer_email or "unknown"
+
+                    # Get Cloudways API token from bearer token
+                    cloudways_token = getattr(token_obj, 'cloudways_token', None)
+                    if not cloudways_token:
+                        logger.warning("Bearer token missing cloudways_token", customer_id=customer_id)
+                        cloudways_token = "<token-missing>"
+
+                    customer = Customer(
+                        customer_id=customer_id,
+                        email=customer_email,
+                        cloudways_email=customer_email,
+                        cloudways_api_key=cloudways_token,
+                        created_at=datetime.now(timezone.utc),
+                        session_id=None
+                    )
+                    logger.debug("Authenticated via bearer token", customer_id=customer_id)
+                    return customer
+
+        # Priority 1: HTTP cookie (persists across MCP-over-HTTP requests)
+        session_id = http_request.cookies.get('cloudways_mcp_session')
+
+        # Priority 2: MCP context or headers (for first-time connections)
         if not session_id:
-            # Create new session for first-time authentication
-            logger.info("No session_id found, creating new session")
-            session = await session_manager.create_session()
-            session_id = session.session_id
-
-            # Store session_id in context for subsequent requests
-            ctx.session_id = session_id
-
-            # Trigger browser authentication
-            logger.info("Initiating browser authentication", session_id=session_id)
-
-            auth_result = await initiate_browser_auth(
-                session_id=session_id,
-                auth_base_url=AUTH_BASE_URL,
-                session_manager=session_manager,
-                browser_authenticator=browser_authenticator,
-                timeout=300
+            session_id = (
+                getattr(ctx, 'session_id', None) or
+                http_request.headers.get('x-mcp-session-id') or
+                http_request.headers.get('x-session-id')
             )
 
-            if not auth_result.success:
-                logger.error(
-                    "Browser authentication failed",
-                    session_id=session_id,
-                    message=auth_result.message
-                )
-                raise SessionNotFoundError(session_id)
+        if not session_id:
+            # No session_id from MCP - generate a new one
+            logger.info("No session_id found, creating new session")
+            session = await session_manager.create_session()  # Will generate new session_id
+            session_id = session.session_id
+
+            # Try to open browser (will only work for local connections)
+            auth_url = f"{AUTH_BASE_URL}/auth?session_id={session_id}"
+            browser_authenticator.open_browser(auth_url)
+
+            # Raise OAuth error that triggers browser authentication
+            logger.info("Authentication required", session_id=session_id, auth_url=auth_url)
+            oauth_error = create_authorization_required_error(session_id, AUTH_BASE_URL)
+            raise OAuthErrorResponse(oauth_error)
 
         # Get session from storage
         session = await session_manager.get_session(session_id)
 
         if not session:
-            logger.warning("Session not found", session_id=session_id)
-            raise SessionNotFoundError(session_id)
+            # Session doesn't exist - create new session using MCP's session_id
+            logger.warning("Session not found, creating new session", session_id=session_id)
+            session = await session_manager.create_session(session_id=session_id)  # Use MCP session_id!
+
+            # Try to open browser
+            auth_url = f"{AUTH_BASE_URL}/auth?session_id={session_id}"
+            browser_authenticator.open_browser(auth_url)
+
+            # Raise OAuth error
+            oauth_error = create_authorization_required_error(session_id, AUTH_BASE_URL)
+            raise OAuthErrorResponse(oauth_error)
 
         # Check session status
         if session.auth_status == AuthStatus.PENDING:
             # Authentication still pending
             logger.info("Authentication pending", session_id=session_id)
-            raise SessionNotFoundError(session_id)
+
+            # Try to open browser again (in case it didn't open before)
+            auth_url = f"{AUTH_BASE_URL}/auth?session_id={session_id}"
+            browser_authenticator.open_browser(auth_url)
+
+            # Raise OAuth error
+            oauth_error = create_authentication_pending_error(session_id, AUTH_BASE_URL)
+            raise OAuthErrorResponse(oauth_error)
 
         elif session.auth_status == AuthStatus.EXPIRED or session.is_expired():
-            # Token expired - trigger re-authentication
-            logger.info("Session/token expired, initiating re-authentication", session_id=session_id)
+            # Token expired - user must re-authenticate
+            logger.info("Session/token expired", session_id=session_id)
 
-            auth_result = await initiate_re_authentication(
-                session_id=session_id,
-                auth_base_url=AUTH_BASE_URL,
-                session_manager=session_manager,
-                browser_authenticator=browser_authenticator,
-                reason="expired"
-            )
+            # Try to open browser for re-authentication
+            auth_url = f"{AUTH_BASE_URL}/auth?session_id={session_id}&reason=expired"
+            browser_authenticator.open_browser(auth_url)
 
-            if not auth_result.success:
-                logger.error(
-                    "Re-authentication failed",
-                    session_id=session_id,
-                    message=auth_result.message
-                )
-                raise TokenExpiredError(session_id, session.token_expires_at)
-
-            # Reload session after re-authentication
-            session = await session_manager.get_session(session_id)
-            if not session or not session.is_authenticated():
-                raise SessionNotFoundError(session_id)
+            # Raise OAuth error for token expiration
+            oauth_error = create_token_expired_error(session_id, AUTH_BASE_URL)
+            raise OAuthErrorResponse(oauth_error)
 
         elif session.auth_status == AuthStatus.AUTHENTICATED:
             # Session is authenticated and valid
@@ -237,7 +287,7 @@ async def get_customer_from_session(
 
         return customer
 
-    except (SessionNotFoundError, TokenExpiredError):
+    except (SessionNotFoundError, TokenExpiredError, OAuthErrorResponse):
         raise
     except Exception as e:
         logger.error("Failed to get customer from session", error=str(e), exc_info=True)

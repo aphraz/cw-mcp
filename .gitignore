@@ -175,3 +175,7 @@ gunicorn.pid
 
 # openapi spec
 cloudways.yaml
+
+# Markdown files (except README.md)
+*.md
+!README.md

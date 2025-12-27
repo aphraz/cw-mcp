@@ -13,6 +13,7 @@ from config import CLOUDWAYS_API_BASE
 from auth.customer import get_customer_from_session
 from auth.tokens import get_cloudways_token
 from auth.rate_limit import check_rate_limit
+from auth.oauth_error import OAuthErrorResponse
 
 logger = structlog.get_logger(__name__)
 
@@ -73,18 +74,22 @@ async def make_api_request(ctx: Context, endpoint: str, params: Optional[Dict[st
         
         return result
         
+    except OAuthErrorResponse as e:
+        # Return OAuth error dictionary for browser authentication
+        logger.info("API request requires authentication", endpoint=endpoint, error=e.oauth_error.error)
+        return e.oauth_error.to_dict()
     except httpx.HTTPStatusError as e:
         request_time = time.time() - start_time
-        logger.error("API request failed - HTTP error", 
-                    endpoint=endpoint, 
+        logger.error("API request failed - HTTP error",
+                    endpoint=endpoint,
                     status_code=e.response.status_code,
                     request_time_ms=round(request_time * 1000, 2),
                     response_text=e.response.text[:200])
         return {"status": "error", "message": f"HTTP error: {e.response.status_code}"}
     except Exception as e:
         request_time = time.time() - start_time
-        logger.error("API request failed - exception", 
-                    endpoint=endpoint, 
+        logger.error("API request failed - exception",
+                    endpoint=endpoint,
                     error_type=type(e).__name__,
                     error=str(e),
                     request_time_ms=round(request_time * 1000, 2))
@@ -118,6 +123,10 @@ async def make_api_request_post(ctx: Context, endpoint: str, data: Optional[Dict
         logger.info("API POST request successful", customer_id=customer.customer_id, customer_email=customer.email, endpoint=endpoint)
         return result
         
+    except OAuthErrorResponse as e:
+        # Return OAuth error dictionary for browser authentication
+        logger.info("API POST request requires authentication", endpoint=endpoint, error=e.oauth_error.error)
+        return e.oauth_error.to_dict()
     except httpx.HTTPStatusError as e:
         logger.error("API POST request failed", endpoint=endpoint, status_code=e.response.status_code)
         return {"status": "error", "message": f"HTTP error: {e.response.status_code}"}

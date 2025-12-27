@@ -126,14 +126,20 @@ class SessionManager:
         combined = random_bytes + timestamp
         return hashlib.sha256(combined).hexdigest()
 
-    async def create_session(self) -> AuthSession:
+    async def create_session(self, session_id: Optional[str] = None) -> AuthSession:
         """
         Create a new pending authentication session.
+
+        Args:
+            session_id: Optional session ID to use (e.g., from MCP transport).
+                       If not provided, a new one will be generated.
 
         Returns:
             New AuthSession with PENDING status
         """
-        session_id = self.generate_session_id()
+        if not session_id:
+            session_id = self.generate_session_id()
+
         session = AuthSession(
             session_id=session_id,
             auth_status=AuthStatus.PENDING,

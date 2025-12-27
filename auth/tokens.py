@@ -168,10 +168,12 @@ async def get_cloudways_token(
         SessionNotFoundError: If session/token not found
         TokenExpiredError: If token has expired
     """
-    logger.warning(
-        "DEPRECATED: get_cloudways_token() called - migrate to session-based auth",
-        customer_id=customer.customer_id if hasattr(customer, 'customer_id') else 'unknown'
-    )
+    # Check if customer already has the Cloudways token (from bearer token auth)
+    if hasattr(customer, 'cloudways_api_key') and customer.cloudways_api_key:
+        # Skip placeholders
+        if customer.cloudways_api_key not in ["<token-based>", "<token-missing>"]:
+            logger.debug("Using Cloudways token from customer object (bearer token auth)")
+            return customer.cloudways_api_key
 
     if token_manager:
         # Use session-based authentication
