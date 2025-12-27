@@ -434,16 +434,16 @@ async def submit_credentials(
         cloudways_token = token_data["access_token"]
         expires_in = token_data.get("expires_in", 3600)
 
-        # Encrypt and store Cloudways token
-        from config import fernet
-        encrypted_token = fernet.encrypt(cloudways_token.encode()).decode()
-        cloudways_token_key = f"session:{session_id}:cloudways_token"
-        await resources.redis_client.setex(cloudways_token_key, expires_in, encrypted_token)
-
-        # Generate customer ID
+        # Generate customer ID first (needed for customer-bound keys)
         import hashlib
         customer_hash = hashlib.sha256(f"{email}:{session_id}".encode()).hexdigest()
         customer_id = f"customer_{customer_hash[:16]}"
+
+        # Encrypt and store Cloudways token with customer-bound key
+        from config import fernet
+        encrypted_token = fernet.encrypt(cloudways_token.encode()).decode()
+        cloudways_token_key = f"session:{customer_id}:{session_id}:cloudways_token"
+        await resources.redis_client.setex(cloudways_token_key, expires_in, encrypted_token)
 
         # Update session status
         import time
