@@ -911,10 +911,11 @@ def main():
     # For MCP: use single worker to maintain session state
     # Scale horizontally with multiple instances behind a load balancer instead
     # Simple uvicorn config for lifespan compatibility
+    port = int(os.getenv("PORT", "7000"))
     uvicorn.run(
         app,
         host="0.0.0.0",
-        port=7000,
+        port=port,
         log_level="info"
     )
 
@@ -922,10 +923,11 @@ if __name__ == "__main__":
     # For development: single worker with reload
     import sys
     if "--dev" in sys.argv:
+        port = int(os.getenv("PORT", "7000"))
         uvicorn.run(
             "main:app",
             host="0.0.0.0",
-            port=7000,
+            port=port,
             reload=True,
             log_level="debug"
         )
