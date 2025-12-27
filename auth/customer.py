@@ -72,9 +72,10 @@ async def get_customer_from_headers(ctx: Context, redis_client: Optional[redis.R
             # Generate unique session ID for this connection
             import secrets
             session_id = secrets.token_urlsafe(32)
-        
-        # Include session in customer ID to ensure session isolation
-        customer_hash = hashlib.sha256(f"{email}:{api_key}:{session_id}".encode()).hexdigest()
+
+        # Generate customer ID from email:api_key (NOT session_id)
+        # This ensures same customer across MCP sessions for token caching
+        customer_hash = hashlib.sha256(f"{email}:{api_key}".encode()).hexdigest()
         customer_id = f"customer_{customer_hash[:16]}"
         
         # Check cache
