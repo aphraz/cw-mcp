@@ -10,7 +10,7 @@ from fastmcp import Context
 import structlog
 
 from config import CLOUDWAYS_API_BASE
-from auth.customer import get_customer_from_session
+from auth.customer import get_customer
 from auth.tokens import get_cloudways_token
 from auth.rate_limit import check_rate_limit
 from auth.oauth_error import OAuthErrorResponse
@@ -28,7 +28,7 @@ async def make_api_request(ctx: Context, endpoint: str, params: Optional[Dict[st
     start_time = time.time()
 
     try:
-        customer = await get_customer_from_session(ctx, session_manager, browser_authenticator, redis_client)
+        customer = await get_customer(ctx, session_manager, browser_authenticator, redis_client)
         if not customer:
             logger.warning("API request failed - no authentication", endpoint=endpoint)
             return {"status": "error", "message": "Authentication required"}
@@ -103,7 +103,7 @@ async def make_api_request_post(ctx: Context, endpoint: str, data: Optional[Dict
                               browser_authenticator = None) -> Dict[str, Any]:
     """Make authenticated POST API request to Cloudways with OAuth browser authentication"""
     try:
-        customer = await get_customer_from_session(ctx, session_manager, browser_authenticator, redis_client)
+        customer = await get_customer(ctx, session_manager, browser_authenticator, redis_client)
         if not customer:
             return {"status": "error", "message": "Authentication required"}
         

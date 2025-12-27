@@ -315,15 +315,57 @@ async def _cache_customer(customer: Customer, redis_client: Optional[redis.Redis
         return
 
     try:
-        encrypted_api_key = fernet.encrypt(customer.cloudways_api_key.encode()).decode()
-        customer_data = {
-            "customer_id": customer.customer_id,
-            "email": customer.email,
-            "cloudways_email": customer.cloudways_email,
-            "encrypted_api_key": encrypted_api_key,
-            "created_at": customer.created_at.isoformat(),
-            "last_seen": customer.last_seen.isoformat()
-        }
-        await redis_client.setex(f"customer:{customer.customer_id}", 3600, json.dumps(customer_data))
+        # Only cache API key for header-based auth
+        if customer.cloudways_api_key:
+            encrypted_api_key = fernet.encrypt(customer.cloudways_api_key.encode()).decode()
+            customer_data = {
+                "customer_id": customer.customer_id,
+                "email": customer.email,
+                "cloudways_email": customer.cloudways_email,
+                "encrypted_api_key": encrypted_api_key,
+                "created_at": customer.created_at.isoformat(),
+                "last_seen": customer.last_seen.isoformat()
+            }
+            await redis_client.setex(f"customer:{customer.customer_id}", 3600, json.dumps(customer_data))
     except Exception as e:
         logger.error("Failed to cache customer", error=str(e))
+
+
+async def get_customer(
+    ctx: Context,
+    session_manager: Optional[SessionManager] = None,
+    browser_authenticator: Optional[BrowserAuthenticator] = None,
+    redis_client: Optional[redis.Redis] = None
+) -> Optional[Customer]:
+    """
+    Unified customer getter that routes based on authentication method.
+
+    Checks request.state.auth_method set by middleware and calls:
+    - "headers": get_customer_from_headers()
+    - "bearer" or "oauth": get_customer_from_session()
+
+    Args:
+        ctx: MCP context
+        session_manager: Session manager (for OAuth)
+        browser_authenticator: Browser authenticator (for OAuth)
+        redis_client: Redis client
+
+    Returns:
+        Customer object or None
+    """
+    try:
+        http_request = get_http_request()
+        auth_method = getattr(http_request.state, 'auth_method', None)
+
+        if auth_method == "headers":
+            # Header-based authentication
+            logger.info("Using header-based auth customer getter")
+            return await get_customer_from_headers(ctx, redis_client)
+        else:
+            # OAuth or bearer token authentication (both use session-based)
+            logger.info("Using session-based auth customer getter", auth_method=auth_method)
+            return await get_customer_from_session(ctx, session_manager, browser_authenticator, redis_client)
+
+    except Exception as e:
+        logger.error("Failed to get customer", error=str(e))
+        return None
